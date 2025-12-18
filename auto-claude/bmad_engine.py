@@ -18,6 +18,7 @@ import yaml
 from agents.session import run_agent_session
 from core.client import create_client
 from task_logger import LogPhase
+from task_logger.models import LogEntryType
 
 
 @dataclass
@@ -103,12 +104,13 @@ class WorkflowEngine:
 
     def find_workflow(self, workflow_name: str) -> Optional[Path]:
         """
-        Find workflow directory by name.
+        Find workflow directory by name from frontmatter metadata.
 
-        Searches across all phase directories.
+        Searches across all phase directories and matches the 'name' field
+        from workflow.md frontmatter, not the directory name.
 
         Args:
-            workflow_name: Workflow identifier (e.g., "create-prd")
+            workflow_name: Workflow identifier from frontmatter (e.g., "create-prd")
 
         Returns:
             Path to workflow directory or None
@@ -121,10 +123,23 @@ class WorkflowEngine:
             if not phase_dir.is_dir():
                 continue
 
-            # Check direct child directories
-            workflow_dir = phase_dir / workflow_name
-            if workflow_dir.exists() and (workflow_dir / "workflow.md").exists():
-                return workflow_dir
+            # Check all workflow directories in this phase
+            for workflow_dir in sorted(phase_dir.iterdir()):
+                if not workflow_dir.is_dir():
+                    continue
+
+                workflow_file = workflow_dir / "workflow.md"
+                if not workflow_file.exists():
+                    continue
+
+                # Parse frontmatter and check name field
+                try:
+                    metadata = self._parse_frontmatter(workflow_file)
+                    if metadata.get("name") == workflow_name:
+                        return workflow_dir
+                except Exception:
+                    # Skip workflows with parse errors
+                    continue
 
         return None
 
@@ -236,7 +251,7 @@ class WorkflowEngine:
 
         return steps
 
-    def execute_workflow(
+    async def execute_workflow(
         self,
         workflow_name: str,
         context: Optional[Dict] = None,
@@ -286,7 +301,7 @@ class WorkflowEngine:
                 callbacks["on_step_start"](step_num, step.name)
 
             # Execute step
-            step_result = self._execute_step(workflow, step, context)
+            step_result = await self._execute_step(workflow, step, context)
 
             if step_result.status == "failed":
                 error_msg = f"Step {step_num} failed: {step_result.error}"
@@ -320,7 +335,7 @@ class WorkflowEngine:
 
         return WorkflowResult(status="success", outputs=outputs)
 
-    def _execute_step(
+    async def _execute_step(
         self, workflow: Workflow, step: WorkflowStep, context: Dict
     ) -> StepResult:
         """
@@ -350,6 +365,27 @@ class WorkflowEngine:
             return StepResult(status="failed", error=f"Step file not found: {step.file}")
 
         step_content = step_file.read_text()
+
+        # Get task_logger from context for real-time visibility
+        task_logger = context.get("task_logger")
+        subphase_name = f"{workflow.name} / {step.name}"
+
+        # Log workflow step start with subphase grouping
+        if task_logger:
+            task_logger.start_subphase(
+                subphase=subphase_name,
+                phase=LogPhase.PLANNING
+            )
+
+            # Log step execution with full prompt in collapsible detail
+            task_logger.log_with_detail(
+                content=f"Executing step: {step.name}",
+                detail=f"**Agent:** {step.agent}\n\n**Step Prompt:**\n\n{step_content}",
+                entry_type=LogEntryType.INFO,
+                phase=LogPhase.PLANNING,
+                subphase=subphase_name,
+                collapsed=True
+            )
 
         # Get execution parameters from context
         project_dir = Path(context.get("project_dir", self.project_path))
@@ -398,24 +434,42 @@ class WorkflowEngine:
 
 Please follow the instructions in the step carefully. This is a collaborative workflow - ask questions, gather user input, and work interactively to complete this step."""
 
-            # Run the agent session (this is async, so we need to run it)
-            status, response_text = asyncio.run(
-                run_agent_session(
+            # Run the agent session using async context manager
+            # (automatically handles connect/disconnect)
+            async with client:
+                status, response_text = await run_agent_session(
                     client=client,
                     message=initial_message,
                     spec_dir=spec_dir,
                     verbose=verbose,
                     phase=LogPhase.PLANNING,  # BMAD workflows are planning/design phase
                 )
-            )
 
             # Check result status
             if status == "complete" or status == "continue":
+                # Log step completion
+                if task_logger:
+                    task_logger.log(
+                        content=f"✓ Completed: {step.name}",
+                        entry_type=LogEntryType.SUCCESS,
+                        phase=LogPhase.PLANNING,
+                        subphase=subphase_name
+                    )
+
                 return StepResult(
                     status="success",
                     output=response_text,
                 )
             else:
+                # Log step failure
+                if task_logger:
+                    task_logger.log(
+                        content=f"✗ Failed: {step.name}",
+                        entry_type=LogEntryType.ERROR,
+                        phase=LogPhase.PLANNING,
+                        subphase=subphase_name
+                    )
+
                 return StepResult(
                     status="failed",
                     error=f"Agent session ended with status: {status}",
@@ -423,6 +477,15 @@ Please follow the instructions in the step carefully. This is a collaborative wo
                 )
 
         except Exception as e:
+            # Log exception
+            if task_logger:
+                task_logger.log(
+                    content=f"✗ Error in {step.name}: {str(e)}",
+                    entry_type=LogEntryType.ERROR,
+                    phase=LogPhase.PLANNING,
+                    subphase=subphase_name
+                )
+
             return StepResult(
                 status="failed",
                 error=f"Error executing step: {str(e)}",

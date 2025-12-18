@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from models import Task, Epic, Artifact
+from models import Task, WorkUnit
 
 
 class FrameworkAdapter(ABC):
@@ -53,25 +53,25 @@ class FrameworkAdapter(ABC):
         pass
 
     @abstractmethod
-    def create_epic(self, epic: Epic) -> str:
+    def create_work_unit(self, work_unit: WorkUnit) -> str:
         """
-        Create an epic in framework-specific format.
+        Create a work unit (epic/phase) in framework-specific format.
 
         Args:
-            epic: Unified epic model
+            work_unit: Unified work unit model
 
         Returns:
-            Epic identifier
+            Work unit identifier
         """
         pass
 
     @abstractmethod
-    def update_epic(self, epic_id: str, updates: Dict) -> bool:
+    def update_work_unit(self, work_unit_id: str, updates: Dict) -> bool:
         """
-        Update existing epic.
+        Update existing work unit.
 
         Args:
-            epic_id: Epic identifier
+            work_unit_id: Work unit identifier
             updates: Dict of fields to update
 
         Returns:
@@ -79,18 +79,8 @@ class FrameworkAdapter(ABC):
         """
         pass
 
-    @abstractmethod
-    def create_artifact(self, artifact: Artifact) -> str:
-        """
-        Create an artifact (PRD, Architecture, etc.).
-
-        Args:
-            artifact: Unified artifact model
-
-        Returns:
-            Artifact path
-        """
-        pass
+    # Note: Artifact creation removed - not part of unified model
+    # BMAD workflows create artifacts directly in _bmad-output/
 
     @abstractmethod
     def get_artifacts_directory(self) -> Path:
@@ -145,115 +135,100 @@ class BMADAdapter(FrameworkAdapter):
         # (Simplified implementation)
         return True
 
-    def create_epic(self, epic: Epic) -> str:
+    def create_work_unit(self, work_unit: WorkUnit) -> str:
         """
-        Create epic as markdown file.
+        Create work unit (epic) as markdown file.
 
         Args:
-            epic: Epic to create
+            work_unit: WorkUnit to create
 
         Returns:
-            Epic file path
+            Work unit file path
         """
         output_dir = self.get_artifacts_directory()
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Generate epic filename
-        epic_id = epic.title.lower().replace(" ", "-")
-        epic_file = output_dir / f"epic-{epic_id}.md"
+        # Generate work unit filename
+        work_unit_id = work_unit.title.lower().replace(" ", "-")
+        work_unit_file = output_dir / f"epic-{work_unit_id}.md"
 
         # Generate markdown content
-        content = self._generate_epic_markdown(epic)
+        content = self._generate_work_unit_markdown(work_unit)
 
         # Write file
-        epic_file.write_text(content)
+        work_unit_file.write_text(content)
 
-        return str(epic_file)
+        return str(work_unit_file)
 
-    def update_epic(self, epic_id: str, updates: Dict) -> bool:
-        """Update epic file."""
-        epic_file = self.get_artifacts_directory() / f"{epic_id}.md"
+    def update_work_unit(self, work_unit_id: str, updates: Dict) -> bool:
+        """Update work unit file."""
+        work_unit_file = self.get_artifacts_directory() / f"{work_unit_id}.md"
 
-        if not epic_file.exists():
+        if not work_unit_file.exists():
             return False
 
         # Read, update, write
         # (Simplified implementation)
         return True
 
-    def create_artifact(self, artifact: Artifact) -> str:
+    def _generate_work_unit_markdown(self, work_unit: WorkUnit) -> str:
         """
-        Create artifact file.
+        Generate work unit (epic) markdown content.
 
         Args:
-            artifact: Artifact to create
-
-        Returns:
-            Artifact file path
-        """
-        output_dir = self.get_artifacts_directory()
-        output_dir.mkdir(parents=True, exist_ok=True)
-
-        # Determine filename
-        if artifact.path:
-            artifact_file = output_dir / artifact.path
-        else:
-            artifact_file = output_dir / f"{artifact.type}.md"
-
-        # Write content
-        artifact_file.write_text(artifact.content)
-
-        return str(artifact_file)
-
-    def _generate_epic_markdown(self, epic: Epic) -> str:
-        """
-        Generate epic markdown content.
-
-        Args:
-            epic: Epic model
+            work_unit: WorkUnit model
 
         Returns:
             Markdown content
         """
         lines = [
-            f"# Epic: {epic.title}",
+            f"# Epic: {work_unit.title}",
             "",
-            f"**Status:** {epic.status}",
-            f"**Phase:** {epic.phase}",
-            f"**Priority:** {epic.priority}",
+            f"**Status:** {work_unit.status.value if hasattr(work_unit.status, 'value') else work_unit.status}",
             "",
             "## Description",
             "",
-            epic.description,
-            "",
-            "## User Value",
-            "",
-            epic.user_value,
+            work_unit.description,
             "",
         ]
 
-        if epic.dependencies:
-            lines.extend(
-                [
-                    "## Dependencies",
-                    "",
-                    *[f"- {dep}" for dep in epic.dependencies],
-                    "",
-                ]
-            )
+        # Add metadata if present
+        if work_unit.metadata:
+            phase = work_unit.metadata.get("phase")
+            priority = work_unit.metadata.get("priority")
+            user_value = work_unit.metadata.get("user_value")
+            dependencies = work_unit.metadata.get("dependencies", [])
+
+            if phase:
+                lines.insert(3, f"**Phase:** {phase}")
+            if priority:
+                lines.insert(3, f"**Priority:** {priority}")
+
+            if user_value:
+                lines.extend(["## User Value", "", user_value, ""])
+
+            if dependencies:
+                lines.extend(
+                    [
+                        "## Dependencies",
+                        "",
+                        *[f"- {dep}" for dep in dependencies],
+                        "",
+                    ]
+                )
 
         lines.extend(["## Stories", ""])
 
-        for i, story in enumerate(epic.stories, 1):
+        for i, task in enumerate(work_unit.tasks, 1):
             lines.extend(
                 [
-                    f"### Story {i}: {story.title}",
+                    f"### Story {i}: {task.title}",
                     "",
-                    story.description,
+                    task.description,
                     "",
                     "**Acceptance Criteria:**",
                     "",
-                    *[f"- {ac}" for ac in story.acceptance_criteria],
+                    *[f"- {ac}" for ac in task.acceptance_criteria],
                     "",
                 ]
             )
@@ -304,53 +279,30 @@ class NativeAdapter(FrameworkAdapter):
         # (Simplified implementation)
         return True
 
-    def create_epic(self, epic: Epic) -> str:
+    def create_work_unit(self, work_unit: WorkUnit) -> str:
         """
-        Create epic - in Native, epics are collections of specs.
+        Create work unit - in Native, work units are collections of specs.
 
         Args:
-            epic: Epic to create
+            work_unit: WorkUnit to create
 
         Returns:
-            Epic identifier
+            Work unit identifier
         """
-        # In Native framework, epics don't have special files
-        # Each story becomes a separate spec
-        epic_id = epic.title.lower().replace(" ", "-")
+        # In Native framework, work units don't have special files
+        # Each task becomes a separate spec
+        work_unit_id = work_unit.title.lower().replace(" ", "-")
 
-        for story in epic.stories:
-            story.epic_id = epic_id
-            self.create_task(story)
+        for task in work_unit.tasks:
+            # Store work unit reference in metadata
+            task.metadata["work_unit_id"] = work_unit_id
+            self.create_task(task)
 
-        return epic_id
+        return work_unit_id
 
-    def update_epic(self, epic_id: str, updates: Dict) -> bool:
-        """Update epic (updates constituent specs)."""
+    def update_work_unit(self, work_unit_id: str, updates: Dict) -> bool:
+        """Update work unit (updates constituent specs)."""
         return True
-
-    def create_artifact(self, artifact: Artifact) -> str:
-        """
-        Create artifact file.
-
-        Args:
-            artifact: Artifact to create
-
-        Returns:
-            Artifact file path
-        """
-        output_dir = self.get_artifacts_directory().parent
-        output_dir.mkdir(parents=True, exist_ok=True)
-
-        # Determine filename
-        if artifact.path:
-            artifact_file = output_dir / artifact.path
-        else:
-            artifact_file = output_dir / f"{artifact.type}.md"
-
-        # Write content
-        artifact_file.write_text(artifact.content)
-
-        return str(artifact_file)
 
     def _generate_spec_markdown(self, task: Task) -> str:
         """Generate spec.md content."""

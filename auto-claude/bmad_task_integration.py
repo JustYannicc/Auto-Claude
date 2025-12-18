@@ -102,7 +102,7 @@ async def run_bmad_planning(
                   bmad_output=str(bmad_output))
 
     print()
-    print_section("BMAD PLANNING", Icons.ROCKET)
+    print_section("BMAD PLANNING", Icons.GEAR)
     print()
     print(f"Task: {task_description}")
     print(f"Spec directory: {spec_dir}")
@@ -125,6 +125,7 @@ async def run_bmad_planning(
             "task_description": task_description,
             "model": model,
             "verbose": is_debug_enabled(),  # Use debug mode for verbosity
+            "task_logger": task_logger,  # Pass logger for real-time visibility
         }
 
         debug_detailed("bmad_integration", "Workflow context prepared",
@@ -141,7 +142,7 @@ async def run_bmad_planning(
         debug("bmad_integration", "Starting PRD workflow")
         print_status("Phase 1: Creating PRD...", "info")
 
-        prd_result = planner.create_prd(
+        prd_result = await planner.create_prd(
             context=workflow_context,
             callbacks=_create_workflow_callbacks("PRD")
         )
@@ -161,7 +162,7 @@ async def run_bmad_planning(
         debug("bmad_integration", "Starting Architecture workflow")
         print_status("Phase 2: Creating architecture...", "info")
 
-        arch_result = planner.create_architecture(
+        arch_result = await planner.create_architecture(
             context=workflow_context,
             callbacks=_create_workflow_callbacks("Architecture")
         )
@@ -181,7 +182,7 @@ async def run_bmad_planning(
         debug("bmad_integration", "Starting Epics & Stories workflow")
         print_status("Phase 3: Creating epics and stories...", "info")
 
-        epics_result = planner.create_epics_and_stories(
+        epics_result = await planner.create_epics_and_stories(
             context=workflow_context,
             callbacks=_create_workflow_callbacks("Epics & Stories")
         )
@@ -397,36 +398,41 @@ def run_bmad_development(
     # Workspace setup (same as native)
     debug("bmad_integration", "Configuring workspace")
     workspace_mode = choose_workspace(
+        project_dir=project_dir,
+        spec_name=spec_dir.name,
         force_isolated=False,  # Let Auto Claude decide
         force_direct=False,
+        auto_continue=auto_continue,
     )
     debug("bmad_integration", "Workspace mode selected",
           mode=str(workspace_mode))
 
-    workspace_path, worktree_path, source_spec_dir = setup_workspace(
+    workspace_path, worktree_manager, source_spec_dir = setup_workspace(
         project_dir=project_dir,
-        spec_dir=spec_dir,
+        spec_name=spec_dir.name,
         mode=workspace_mode,
+        source_spec_dir=spec_dir,
         base_branch=base_branch,
     )
 
     debug_success("bmad_integration", "Workspace configured",
                  workspace_path=str(workspace_path),
-                 worktree_path=str(worktree_path) if worktree_path else "none")
+                 has_worktree=worktree_manager is not None)
 
     # Run the autonomous agent
     # This will execute the subtasks from implementation_plan.json
     try:
         debug("bmad_integration", "Starting autonomous agent execution")
 
-        run_autonomous_agent(
-            project_dir=workspace_path,
-            spec_dir=spec_dir,
-            source_spec_dir=source_spec_dir,
-            model=model,
-            max_iterations=max_iterations,
-            verbose=verbose,
-            auto_continue=auto_continue,
+        asyncio.run(
+            run_autonomous_agent(
+                project_dir=workspace_path,
+                spec_dir=spec_dir,
+                source_spec_dir=source_spec_dir,
+                model=model,
+                max_iterations=max_iterations,
+                verbose=verbose,
+            )
         )
 
         debug_success("bmad_integration", "Agent execution completed")
@@ -436,11 +442,9 @@ def run_bmad_development(
 
         finalize_workspace(
             project_dir=project_dir,
-            spec_dir=spec_dir,
-            mode=workspace_mode,
-            worktree_path=worktree_path,
-            skip_qa=skip_qa,
-            model=model,
+            spec_name=spec_dir.name,
+            manager=worktree_manager,
+            auto_continue=auto_continue,
         )
 
         debug_success("bmad_integration", "BMAD development complete")
@@ -520,15 +524,24 @@ def convert_bmad_to_implementation_plan(work_units: List) -> Dict:
 
         for i, story in enumerate(epic.tasks, 1):
             # Each story becomes a subtask
+            # Convert Checkpoint objects to strings (extract descriptions)
+            if hasattr(story, 'checkpoints') and story.checkpoints:
+                acceptance_criteria = [
+                    checkpoint.description if hasattr(checkpoint, 'description') else str(checkpoint)
+                    for checkpoint in story.checkpoints
+                ]
+            else:
+                acceptance_criteria = [
+                    "Story completed according to acceptance criteria",
+                    "Tests passing",
+                    "Code reviewed"
+                ]
+
             subtasks.append({
                 "id": f"{epic.id}.{i}",
                 "description": story.title,
                 "details": story.description if hasattr(story, 'description') else "",
-                "acceptance_criteria": story.checkpoints if hasattr(story, 'checkpoints') else [
-                    "Story completed according to acceptance criteria",
-                    "Tests passing",
-                    "Code reviewed"
-                ],
+                "acceptance_criteria": acceptance_criteria,
                 "status": story.status.value if hasattr(story.status, 'value') else "pending",
             })
 

@@ -28,7 +28,7 @@ class BMADPlanning:
         self.engine = WorkflowEngine(project_path)
         self.adapter = get_adapter(project_path)
 
-    def create_product_brief(
+    async def create_product_brief(
         self, context: Optional[Dict] = None, callbacks: Optional[Dict] = None
     ) -> WorkflowResult:
         """
@@ -41,11 +41,11 @@ class BMADPlanning:
         Returns:
             WorkflowResult
         """
-        return self.engine.execute_workflow(
+        return await self.engine.execute_workflow(
             "create-product-brief", context=context or {}, callbacks=callbacks
         )
 
-    def create_prd(
+    async def create_prd(
         self, context: Optional[Dict] = None, callbacks: Optional[Dict] = None
     ) -> WorkflowResult:
         """
@@ -60,11 +60,11 @@ class BMADPlanning:
         Returns:
             WorkflowResult
         """
-        return self.engine.execute_workflow(
+        return await self.engine.execute_workflow(
             "create-prd", context=context or {}, callbacks=callbacks
         )
 
-    def create_architecture(
+    async def create_architecture(
         self, context: Optional[Dict] = None, callbacks: Optional[Dict] = None
     ) -> WorkflowResult:
         """
@@ -79,11 +79,11 @@ class BMADPlanning:
         Returns:
             WorkflowResult
         """
-        return self.engine.execute_workflow(
+        return await self.engine.execute_workflow(
             "create-architecture", context=context or {}, callbacks=callbacks
         )
 
-    def create_ux_design(
+    async def create_ux_design(
         self, context: Optional[Dict] = None, callbacks: Optional[Dict] = None
     ) -> WorkflowResult:
         """
@@ -98,11 +98,11 @@ class BMADPlanning:
         Returns:
             WorkflowResult
         """
-        return self.engine.execute_workflow(
+        return await self.engine.execute_workflow(
             "create-ux-design", context=context or {}, callbacks=callbacks
         )
 
-    def create_epics_and_stories(
+    async def create_epics_and_stories(
         self, context: Optional[Dict] = None, callbacks: Optional[Dict] = None
     ) -> WorkflowResult:
         """
@@ -117,11 +117,11 @@ class BMADPlanning:
         Returns:
             WorkflowResult
         """
-        return self.engine.execute_workflow(
+        return await self.engine.execute_workflow(
             "create-epics-and-stories", context=context or {}, callbacks=callbacks
         )
 
-    def check_implementation_readiness(
+    async def check_implementation_readiness(
         self, context: Optional[Dict] = None, callbacks: Optional[Dict] = None
     ) -> WorkflowResult:
         """
@@ -136,7 +136,7 @@ class BMADPlanning:
         Returns:
             WorkflowResult
         """
-        return self.engine.execute_workflow(
+        return await self.engine.execute_workflow(
             "check-implementation-readiness", context=context or {}, callbacks=callbacks
         )
 
