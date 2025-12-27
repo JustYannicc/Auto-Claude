@@ -92,6 +92,8 @@ export function App() {
   const [settingsInitialProjectSection, setSettingsInitialProjectSection] = useState<ProjectSettingsSection | undefined>(undefined);
   const [activeView, setActiveView] = useState<SidebarView>('kanban');
   const [isOnboardingWizardOpen, setIsOnboardingWizardOpen] = useState(false);
+  // Archived state for tab controls (will be replaced by ViewStateContext in phase 2)
+  const [showArchived, setShowArchived] = useState(false);
 
   // Initialize dialog state
   const [showInitDialog, setShowInitDialog] = useState(false);
@@ -613,6 +615,11 @@ export function App() {
                   onProjectSelect={handleProjectTabSelect}
                   onProjectClose={handleProjectTabClose}
                   onAddProject={handleAddProject}
+                  // Control props for active tab
+                  onSettingsClick={() => setIsSettingsDialogOpen(true)}
+                  showArchived={showArchived}
+                  archivedCount={tasks.filter(t => t.metadata?.archivedAt).length}
+                  onToggleArchived={() => setShowArchived(prev => !prev)}
                 />
               </SortableContext>
 
