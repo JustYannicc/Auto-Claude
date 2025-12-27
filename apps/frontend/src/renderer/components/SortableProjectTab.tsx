@@ -124,11 +124,13 @@ export function SortableProjectTab({
             <Tooltip delayDuration={200}>
               <TooltipTrigger asChild>
                 <button
+                  type="button"
                   className={cn(
                     'h-5 w-5 sm:h-6 sm:w-6 p-0 rounded',
                     'flex items-center justify-center',
                     'text-muted-foreground hover:text-foreground',
-                    'hover:bg-muted/50 transition-colors'
+                    'hover:bg-muted/50 transition-colors',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1'
                   )}
                   onClick={(e) => {
                     e.stopPropagation();
@@ -150,10 +152,12 @@ export function SortableProjectTab({
             <Tooltip delayDuration={200}>
               <TooltipTrigger asChild>
                 <button
+                  type="button"
                   className={cn(
                     'h-5 sm:h-6 px-1 sm:px-1.5 rounded',
                     'flex items-center justify-center gap-0.5 sm:gap-1',
                     'transition-colors',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1',
                     showArchived
                       ? 'text-primary bg-primary/10 hover:bg-primary/20'
                       : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
@@ -162,7 +166,7 @@ export function SortableProjectTab({
                     e.stopPropagation();
                     onToggleArchived();
                   }}
-                  aria-label={showArchived ? 'Hide archived' : 'Show archived'}
+                  aria-label={showArchived ? 'Hide archived tasks' : 'Show archived tasks'}
                   aria-pressed={showArchived}
                 >
                   <Archive className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
@@ -185,15 +189,18 @@ export function SortableProjectTab({
         <Tooltip delayDuration={200}>
           <TooltipTrigger asChild>
             <button
+              type="button"
               className={cn(
                 'h-5 w-5 sm:h-6 sm:w-6 p-0 mr-0.5 sm:mr-1',
-                'opacity-0 group-hover:opacity-100',
+                'opacity-0 group-hover:opacity-100 focus-visible:opacity-100',
                 'transition-opacity duration-200 rounded flex-shrink-0',
                 'hover:bg-destructive hover:text-destructive-foreground',
                 'flex items-center justify-center',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1',
                 isActive && 'opacity-100'
               )}
               onClick={onClose}
+              aria-label="Close tab"
             >
               <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
