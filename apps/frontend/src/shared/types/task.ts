@@ -250,6 +250,8 @@ export interface Task {
   stagedAt?: string;  // ISO timestamp when changes were staged
   location?: 'main' | 'worktree';  // Where task was loaded from (main project or worktree)
   specsPath?: string;  // Full path to specs directory for this task
+  prUrl?: string;  // URL of the pull request if one was created
+  prCreatedAt?: string;  // ISO timestamp when PR was created
   createdAt: Date;
   updatedAt: Date;
 }
@@ -399,6 +401,17 @@ export interface WorktreeMergeResult {
 export interface WorktreeDiscardResult {
   success: boolean;
   message: string;
+}
+
+/**
+ * Result of creating a pull request from a worktree branch
+ */
+export interface CreatePullRequestResult {
+  success: boolean;
+  message: string;
+  prUrl?: string;
+  prNumber?: number;
+  wasPushed?: boolean;  // true if branch was pushed as part of this operation
 }
 
 /**

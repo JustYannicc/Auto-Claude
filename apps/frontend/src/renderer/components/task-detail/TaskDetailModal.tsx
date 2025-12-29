@@ -25,7 +25,8 @@ import {
   Loader2,
   AlertTriangle,
   Pencil,
-  X
+  X,
+  GitPullRequest
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { calculateProgress } from '../../lib/utils';
@@ -149,6 +150,31 @@ function TaskDetailModalContent({ open, task, onOpenChange, onSwitchToTerminals,
       state.setWorkspaceError(result.data?.message || result.error || 'Failed to discard changes');
     }
     state.setIsDiscarding(false);
+  };
+
+  const handleCreatePR = async () => {
+    if (!state.prTargetBranch) {
+      state.setWorkspaceError('Please select a target branch');
+      return;
+    }
+    state.setIsCreatingPR(true);
+    state.setWorkspaceError(null);
+    try {
+      const result = await window.electronAPI.createPullRequest(task.id, state.prTargetBranch);
+      if (result.success && result.data?.success) {
+        state.setPrSuccess({
+          prUrl: result.data.prUrl || '',
+          message: result.data.message
+        });
+        state.setShowPRBranchSelector(false);
+      } else {
+        state.setWorkspaceError(result.data?.message || result.error || 'Failed to create pull request');
+      }
+    } catch (error) {
+      state.setWorkspaceError(error instanceof Error ? error.message : 'Unknown error creating PR');
+    } finally {
+      state.setIsCreatingPR(false);
+    }
   };
 
   const handleClose = () => {
@@ -291,6 +317,15 @@ function TaskDetailModalContent({ open, task, onOpenChange, onSwitchToTerminals,
                                task.reviewReason === 'plan_review' ? 'Approve Plan' : 'QA Issues'}
                             </Badge>
                           )}
+                          {task.prUrl && (
+                            <Badge
+                              variant="outline"
+                              className="text-xs flex items-center gap-1 bg-purple-500/10 text-purple-400 border-purple-500/30"
+                            >
+                              <GitPullRequest className="h-3 w-3" />
+                              PR Created
+                            </Badge>
+                          )}
                         </>
                       )}
                       {/* Compact progress indicator */}
@@ -414,6 +449,15 @@ function TaskDetailModalContent({ open, task, onOpenChange, onSwitchToTerminals,
                             onClose={handleClose}
                             onSwitchToTerminals={onSwitchToTerminals}
                             onOpenInbuiltTerminal={onOpenInbuiltTerminal}
+                            // PR creation props
+                            isCreatingPR={state.isCreatingPR}
+                            showPRBranchSelector={state.showPRBranchSelector}
+                            prTargetBranch={state.prTargetBranch}
+                            availableBranches={state.availableBranches}
+                            prSuccess={state.prSuccess}
+                            onShowPRBranchSelector={state.setShowPRBranchSelector}
+                            onPrTargetBranchChange={state.setPrTargetBranch}
+                            onCreatePR={handleCreatePR}
                           />
                         </>
                       )}

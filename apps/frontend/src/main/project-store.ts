@@ -422,10 +422,12 @@ export class ProjectStore {
           }));
         }) || [];
 
-        // Extract staged status from plan (set when changes are merged with --no-commit)
-        const planWithStaged = plan as unknown as { stagedInMainProject?: boolean; stagedAt?: string } | null;
-        const stagedInMainProject = planWithStaged?.stagedInMainProject;
-        const stagedAt = planWithStaged?.stagedAt;
+        // Extract staged status and PR info from plan
+        const planWithExtras = plan as unknown as { stagedInMainProject?: boolean; stagedAt?: string; prUrl?: string; prCreatedAt?: string } | null;
+        const stagedInMainProject = planWithExtras?.stagedInMainProject;
+        const stagedAt = planWithExtras?.stagedAt;
+        const prUrl = planWithExtras?.prUrl;
+        const prCreatedAt = planWithExtras?.prCreatedAt;
 
         // Determine title - check if feature looks like a spec ID (e.g., "054-something-something")
         let title = plan?.feature || plan?.title || dir.name;
@@ -459,6 +461,8 @@ export class ProjectStore {
           metadata,
           stagedInMainProject,
           stagedAt,
+          prUrl,
+          prCreatedAt,
           location, // Add location metadata (main vs worktree)
           specsPath: specPath, // Add full path to specs directory
           createdAt: new Date(plan?.created_at || Date.now()),

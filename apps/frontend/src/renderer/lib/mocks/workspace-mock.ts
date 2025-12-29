@@ -89,5 +89,16 @@ export const workspaceMock = {
         { id: 'system', name: 'System Terminal', path: '', installed: true }
       ]
     }
+  }),
+
+  createPullRequest: async (_taskId: string, _targetBranch: string) => ({
+    success: true,
+    data: {
+      success: true,
+      message: 'Pull request created successfully',
+      prUrl: 'https://github.com/mock/repo/pull/1',
+      prNumber: 1,
+      wasPushed: true
+    }
   })
 };

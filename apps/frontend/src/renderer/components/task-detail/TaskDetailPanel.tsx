@@ -115,6 +115,31 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
     state.setIsDiscarding(false);
   };
 
+  const handleCreatePR = async () => {
+    if (!state.prTargetBranch) {
+      state.setWorkspaceError('Please select a target branch');
+      return;
+    }
+    state.setIsCreatingPR(true);
+    state.setWorkspaceError(null);
+    try {
+      const result = await window.electronAPI.createPullRequest(task.id, state.prTargetBranch);
+      if (result.success && result.data?.success) {
+        state.setPrSuccess({
+          prUrl: result.data.prUrl || '',
+          message: result.data.message
+        });
+        state.setShowPRBranchSelector(false);
+      } else {
+        state.setWorkspaceError(result.data?.message || result.error || 'Failed to create pull request');
+      }
+    } catch (error) {
+      state.setWorkspaceError(error instanceof Error ? error.message : 'Unknown error creating PR');
+    } finally {
+      state.setIsCreatingPR(false);
+    }
+  };
+
   return (
     <TooltipProvider delayDuration={300}>
       <div className="flex h-full w-96 flex-col bg-card border-l border-border">
@@ -210,6 +235,16 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
                     onStageOnlyChange={state.setStageOnly}
                     onShowConflictDialog={state.setShowConflictDialog}
                     onLoadMergePreview={state.loadMergePreview}
+                    onClose={onClose}
+                    // PR creation props
+                    isCreatingPR={state.isCreatingPR}
+                    showPRBranchSelector={state.showPRBranchSelector}
+                    prTargetBranch={state.prTargetBranch}
+                    availableBranches={state.availableBranches}
+                    prSuccess={state.prSuccess}
+                    onShowPRBranchSelector={state.setShowPRBranchSelector}
+                    onPrTargetBranchChange={state.setPrTargetBranch}
+                    onCreatePR={handleCreatePR}
                   />
                 )}
               </div>

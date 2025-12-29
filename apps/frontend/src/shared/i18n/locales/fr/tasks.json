@@ -25,7 +25,8 @@
     "incomplete": "Incomplet",
     "recovering": "Récupération...",
     "needsRecovery": "Récupération requise",
-    "needsResume": "Reprise requise"
+    "needsResume": "Reprise requise",
+    "prCreated": "PR créée"
   },
   "reviewReason": {
     "completed": "Terminé",
@@ -82,5 +83,18 @@
       "code": "Code",
       "qa": "QA"
     }
+  },
+  "review": {
+    "createPR": "Créer PR",
+    "createPRTitle": "Créer une Pull Request",
+    "targetBranch": "Branche cible",
+    "selectBranch": "Sélectionner une branche",
+    "creatingPR": "Création de la PR...",
+    "viewPR": "Voir la PR",
+    "prCreated": "Pull request créée avec succès",
+    "prAlreadyExists": "Une pull request existe déjà pour cette branche",
+    "ghNotInstalled": "GitHub CLI (gh) introuvable. Installez-le depuis https://cli.github.com/",
+    "pushFailed": "Échec du push de la branche vers le remote",
+    "noCommits": "Aucun commit pour créer une pull request"
   }
 }

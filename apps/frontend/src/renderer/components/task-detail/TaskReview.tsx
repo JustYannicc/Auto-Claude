@@ -42,6 +42,15 @@ interface TaskReviewProps {
   onClose?: () => void;
   onSwitchToTerminals?: () => void;
   onOpenInbuiltTerminal?: (id: string, cwd: string) => void;
+  // PR creation props
+  isCreatingPR?: boolean;
+  showPRBranchSelector?: boolean;
+  prTargetBranch?: string;
+  availableBranches?: string[];
+  prSuccess?: { prUrl: string; message: string } | null;
+  onShowPRBranchSelector?: (show: boolean) => void;
+  onPrTargetBranchChange?: (branch: string) => void;
+  onCreatePR?: () => void;
 }
 
 /**
@@ -83,7 +92,16 @@ export function TaskReview({
   onLoadMergePreview,
   onClose,
   onSwitchToTerminals,
-  onOpenInbuiltTerminal
+  onOpenInbuiltTerminal,
+  // PR creation props
+  isCreatingPR,
+  showPRBranchSelector,
+  prTargetBranch,
+  availableBranches,
+  prSuccess,
+  onShowPRBranchSelector,
+  onPrTargetBranchChange,
+  onCreatePR
 }: TaskReviewProps) {
   return (
     <div className="space-y-4">
@@ -119,6 +137,15 @@ export function TaskReview({
           onClose={onClose}
           onSwitchToTerminals={onSwitchToTerminals}
           onOpenInbuiltTerminal={onOpenInbuiltTerminal}
+          // PR creation props
+          isCreatingPR={isCreatingPR}
+          showPRBranchSelector={showPRBranchSelector}
+          prTargetBranch={prTargetBranch}
+          availableBranches={availableBranches}
+          prSuccess={prSuccess}
+          onShowPRBranchSelector={onShowPRBranchSelector}
+          onPrTargetBranchChange={onPrTargetBranchChange}
+          onCreatePR={onCreatePR}
         />
       ) : task.stagedInMainProject && !stagedSuccess ? (
         <StagedInProjectMessage

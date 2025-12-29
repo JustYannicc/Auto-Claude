@@ -25,7 +25,8 @@
     "incomplete": "Incomplete",
     "recovering": "Recovering...",
     "needsRecovery": "Needs Recovery",
-    "needsResume": "Needs Resume"
+    "needsResume": "Needs Resume",
+    "prCreated": "PR Created"
   },
   "reviewReason": {
     "completed": "Completed",
@@ -82,5 +83,18 @@
       "code": "Code",
       "qa": "QA"
     }
+  },
+  "review": {
+    "createPR": "Create PR",
+    "createPRTitle": "Create Pull Request",
+    "targetBranch": "Target branch",
+    "selectBranch": "Select branch",
+    "creatingPR": "Creating PR...",
+    "viewPR": "View PR",
+    "prCreated": "Pull request created successfully",
+    "prAlreadyExists": "A pull request already exists for this branch",
+    "ghNotInstalled": "GitHub CLI (gh) not found. Install it from https://cli.github.com/",
+    "pushFailed": "Failed to push branch to remote",
+    "noCommits": "No commits to create a pull request from"
   }
 }

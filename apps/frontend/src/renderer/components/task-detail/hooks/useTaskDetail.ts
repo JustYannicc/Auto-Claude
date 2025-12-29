@@ -47,6 +47,13 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [showConflictDialog, setShowConflictDialog] = useState(false);
 
+  // PR creation state
+  const [isCreatingPR, setIsCreatingPR] = useState(false);
+  const [showPRBranchSelector, setShowPRBranchSelector] = useState(false);
+  const [prTargetBranch, setPrTargetBranch] = useState<string>('');
+  const [availableBranches, setAvailableBranches] = useState<string[]>([]);
+  const [prSuccess, setPrSuccess] = useState<{ prUrl: string; message: string } | null>(null);
+
   const selectedProject = useProjectStore((state) => state.getSelectedProject());
   const isRunning = task.status === 'in_progress';
   // isActiveTask includes ai_review for stuck detection (CHANGELOG documents this feature)
@@ -127,6 +134,39 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
       setWorktreeDiff(null);
     }
   }, [task.id, needsReview]);
+
+  // Load available branches for PR creation when task is in human_review
+  useEffect(() => {
+    if (needsReview && selectedProject) {
+      // Get branches
+      window.electronAPI.getGitBranches(selectedProject.path).then((result) => {
+        if (result.success && result.data) {
+          setAvailableBranches(result.data);
+
+          // Set default target branch:
+          // 1. Task's baseBranch if set
+          // 2. Project's defaultBranch
+          // 3. Detected main branch (main/master/develop)
+          const taskBaseBranch = task.metadata?.baseBranch;
+          if (taskBaseBranch && result.data.includes(taskBaseBranch)) {
+            setPrTargetBranch(taskBaseBranch);
+          } else {
+            window.electronAPI.getProjectEnv(selectedProject.id).then((envResult) => {
+              if (envResult.success && envResult.data?.defaultBranch && result.data?.includes(envResult.data.defaultBranch)) {
+                setPrTargetBranch(envResult.data.defaultBranch);
+              } else {
+                // Use main/master/develop as fallback
+                const mainBranch = result.data?.find(b => ['main', 'master', 'develop'].includes(b));
+                if (mainBranch) {
+                  setPrTargetBranch(mainBranch);
+                }
+              }
+            });
+          }
+        }
+      });
+    }
+  }, [needsReview, selectedProject, task.metadata?.baseBranch]);
 
   // Load and watch phase logs
   useEffect(() => {
@@ -291,6 +331,11 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
     mergePreview,
     isLoadingPreview,
     showConflictDialog,
+    isCreatingPR,
+    showPRBranchSelector,
+    prTargetBranch,
+    availableBranches,
+    prSuccess,
 
     // Setters
     setFeedback,
@@ -322,6 +367,11 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
     setMergePreview,
     setIsLoadingPreview,
     setShowConflictDialog,
+    setIsCreatingPR,
+    setShowPRBranchSelector,
+    setPrTargetBranch,
+    setAvailableBranches,
+    setPrSuccess,
 
     // Handlers
     handleLogsScroll,

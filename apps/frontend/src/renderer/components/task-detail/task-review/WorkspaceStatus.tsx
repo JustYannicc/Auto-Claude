@@ -12,13 +12,17 @@ import {
   CheckCircle,
   GitCommit,
   Code,
-  Terminal
+  Terminal,
+  GitPullRequest,
+  ExternalLink
 } from 'lucide-react';
 import { Button } from '../../ui/button';
 import { Checkbox } from '../../ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select';
 import { cn } from '../../../lib/utils';
 import type { WorktreeStatus, MergeConflict, MergeStats, GitConflictInfo, SupportedIDE, SupportedTerminal } from '../../../../shared/types';
 import { useSettingsStore } from '../../../stores/settings-store';
+import { useTranslation } from 'react-i18next';
 
 interface WorkspaceStatusProps {
   worktreeStatus: WorktreeStatus;
@@ -37,6 +41,15 @@ interface WorkspaceStatusProps {
   onClose?: () => void;
   onSwitchToTerminals?: () => void;
   onOpenInbuiltTerminal?: (id: string, cwd: string) => void;
+  // PR creation props
+  isCreatingPR?: boolean;
+  showPRBranchSelector?: boolean;
+  prTargetBranch?: string;
+  availableBranches?: string[];
+  prSuccess?: { prUrl: string; message: string } | null;
+  onShowPRBranchSelector?: (show: boolean) => void;
+  onPrTargetBranchChange?: (branch: string) => void;
+  onCreatePR?: () => void;
 }
 
 /**
@@ -92,8 +105,18 @@ export function WorkspaceStatus({
   onMerge,
   onClose,
   onSwitchToTerminals,
-  onOpenInbuiltTerminal
+  onOpenInbuiltTerminal,
+  // PR creation props
+  isCreatingPR = false,
+  showPRBranchSelector = false,
+  prTargetBranch = '',
+  availableBranches = [],
+  prSuccess = null,
+  onShowPRBranchSelector,
+  onPrTargetBranchChange,
+  onCreatePR
 }: WorkspaceStatusProps) {
+  const { t } = useTranslation(['tasks', 'common']);
   const { settings } = useSettingsStore();
   const preferredIDE = settings.preferredIDE || 'vscode';
   const preferredTerminal = settings.preferredTerminal || 'system';
@@ -385,7 +408,7 @@ export function WorkspaceStatus({
           <Button
             variant={hasGitConflicts || isBranchBehind || hasPathMappedMerges ? "warning" : "success"}
             onClick={onMerge}
-            disabled={isMerging || isDiscarding}
+            disabled={isMerging || isDiscarding || isCreatingPR}
             className="flex-1"
           >
             {isMerging ? (
@@ -402,17 +425,107 @@ export function WorkspaceStatus({
               </>
             )}
           </Button>
+
+          {/* Create PR Button */}
+          {onShowPRBranchSelector && (
+            <Button
+              variant="outline"
+              onClick={() => onShowPRBranchSelector(!showPRBranchSelector)}
+              disabled={isMerging || isDiscarding || isCreatingPR}
+              className="flex items-center gap-2"
+            >
+              <GitPullRequest className="h-4 w-4" />
+              {t('tasks:review.createPR')}
+            </Button>
+          )}
+
           <Button
             variant="outline"
             size="icon"
             onClick={() => onShowDiscardDialog(true)}
-            disabled={isMerging || isDiscarding}
+            disabled={isMerging || isDiscarding || isCreatingPR}
             className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 hover:border-destructive/30"
             title="Discard build"
           >
             <FolderX className="h-4 w-4" />
           </Button>
         </div>
+
+        {/* PR Branch Selector */}
+        {showPRBranchSelector && onPrTargetBranchChange && onCreatePR && onShowPRBranchSelector && (
+          <div className="p-3 rounded-lg border border-border bg-background/50">
+            <div className="flex items-center gap-2 mb-2">
+              <GitPullRequest className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">{t('tasks:review.createPRTitle')}</span>
+            </div>
+
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-sm text-muted-foreground">{t('tasks:review.targetBranch')}:</span>
+              <Select value={prTargetBranch} onValueChange={onPrTargetBranchChange}>
+                <SelectTrigger className="w-[180px] h-8">
+                  <SelectValue placeholder={t('tasks:review.selectBranch')} />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableBranches.map((branch) => (
+                    <SelectItem key={branch} value={branch}>
+                      {branch}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex gap-2">
+              <Button
+                variant="default"
+                size="sm"
+                onClick={onCreatePR}
+                disabled={isCreatingPR || !prTargetBranch}
+              >
+                {isCreatingPR ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {t('tasks:review.creatingPR')}
+                  </>
+                ) : (
+                  <>
+                    <GitPullRequest className="mr-2 h-4 w-4" />
+                    {t('tasks:review.createPR')}
+                  </>
+                )}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onShowPRBranchSelector(false)}
+                disabled={isCreatingPR}
+              >
+                {t('common:buttons.cancel')}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* PR Success Message */}
+        {prSuccess && (
+          <div className="p-3 rounded-lg border border-success/30 bg-success/10">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-success" />
+                <span className="text-sm text-success">{prSuccess.message}</span>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2"
+                onClick={() => window.electronAPI.openExternal(prSuccess.prUrl)}
+              >
+                <ExternalLink className="h-3.5 w-3.5 mr-1" />
+                {t('tasks:review.viewPR')}
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
