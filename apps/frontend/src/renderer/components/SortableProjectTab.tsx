@@ -168,7 +168,7 @@ export function SortableProjectTab({
                     e.stopPropagation();
                     onToggleArchived();
                   }}
-                  aria-label={showArchived ? 'Hide archived tasks' : 'Show archived tasks'}
+                  aria-label={showArchived ? t('projectTab.hideArchivedTasks') : t('projectTab.showArchivedTasks')}
                   aria-pressed={showArchived}
                 >
                   <Archive className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
@@ -180,7 +180,7 @@ export function SortableProjectTab({
                 </button>
               </TooltipTrigger>
               <TooltipContent side="bottom">
-                <span>{showArchived ? 'Hide archived' : 'Show archived'}</span>
+                <span>{showArchived ? t('projectTab.hideArchived') : t('projectTab.showArchived')}</span>
               </TooltipContent>
             </Tooltip>
           )}
@@ -202,7 +202,7 @@ export function SortableProjectTab({
                 isActive && 'opacity-100'
               )}
               onClick={onClose}
-              aria-label="Close tab"
+              aria-label={t('projectTab.closeTab')}
             >
               <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -210,7 +210,7 @@ export function SortableProjectTab({
             </button>
           </TooltipTrigger>
           <TooltipContent side="bottom" className="flex items-center gap-2">
-            <span>Close tab</span>
+            <span>{t('projectTab.closeTab')}</span>
             <kbd className="px-1.5 py-0.5 text-xs bg-muted rounded border border-border font-mono">
               {closeShortcut}
             </kbd>
