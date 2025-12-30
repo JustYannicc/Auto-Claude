@@ -564,6 +564,7 @@ The SDK will run invoked agents in parallel automatically.
                 verdict_reasoning=f"Review failed: {e}",
                 blockers=[str(e)],
                 is_followup_review=True,
+                reviewed_commit_sha=context.current_commit_sha,
             )
 
     def _parse_structured_output(
@@ -714,7 +715,7 @@ The SDK will run invoked agents in parallel automatically.
     def _generate_finding_id(self, file: str, line: int, title: str) -> str:
         """Generate a unique finding ID."""
         content = f"{file}:{line}:{title}"
-        return f"FU-{hashlib.md5(content.encode()).hexdigest()[:8].upper()}"
+        return f"FU-{hashlib.md5(content.encode(), usedforsecurity=False).hexdigest()[:8].upper()}"
 
     def _deduplicate_findings(
         self, findings: list[PRReviewFinding]

@@ -484,6 +484,12 @@ The SDK will run invoked agents in parallel automatically.
             else:
                 overall_status = "approve"
 
+            # Extract HEAD SHA from commits for follow-up review tracking
+            head_sha = None
+            if context.commits:
+                latest_commit = context.commits[-1]
+                head_sha = latest_commit.get("oid") or latest_commit.get("sha")
+
             result = PRReviewResult(
                 pr_number=context.pr_number,
                 repo=self.config.repo,
@@ -494,6 +500,7 @@ The SDK will run invoked agents in parallel automatically.
                 verdict=verdict,
                 verdict_reasoning=verdict_reasoning,
                 blockers=blockers,
+                reviewed_commit_sha=head_sha,
             )
 
             self._report_progress(
