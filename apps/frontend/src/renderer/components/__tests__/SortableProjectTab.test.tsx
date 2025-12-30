@@ -560,8 +560,6 @@ describe('SortableProjectTab', () => {
 
   describe('Tab Selection', () => {
     it('should call onSelect when tab is clicked', () => {
-      const project = createTestProject({ id: 'proj-1' });
-
       mockOnSelect();
 
       expect(mockOnSelect).toHaveBeenCalledTimes(1);
@@ -625,8 +623,7 @@ describe('SortableProjectTab', () => {
   describe('Dragging State', () => {
     it('should apply drag styling when isDragging', () => {
       // From component: isDragging && 'opacity-60 scale-[0.98] shadow-lg'
-      const isDragging = true;
-
+      // When isDragging is true, these classes should be applied
       const expectedDragClasses = ['opacity-60', 'scale-[0.98]', 'shadow-lg'];
 
       expectedDragClasses.forEach(cls => {

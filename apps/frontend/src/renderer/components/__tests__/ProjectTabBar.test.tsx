@@ -166,11 +166,6 @@ describe('ProjectTabBar', () => {
 
   describe('Project Selection', () => {
     it('should call onProjectSelect with correct project ID when tab is clicked', () => {
-      const projects = [
-        createTestProject({ id: 'proj-1', name: 'Project 1' }),
-        createTestProject({ id: 'proj-2', name: 'Project 2' })
-      ];
-
       // Simulate clicking on project 2
       const selectedProjectId = 'proj-2';
       mockOnProjectSelect(selectedProjectId);
@@ -180,11 +175,6 @@ describe('ProjectTabBar', () => {
     });
 
     it('should handle project selection for the first project', () => {
-      const projects = [
-        createTestProject({ id: 'proj-first', name: 'First Project' }),
-        createTestProject({ id: 'proj-second', name: 'Second Project' })
-      ];
-
       const selectedProjectId = 'proj-first';
       mockOnProjectSelect(selectedProjectId);
 
@@ -192,12 +182,6 @@ describe('ProjectTabBar', () => {
     });
 
     it('should handle project selection for the last project', () => {
-      const projects = [
-        createTestProject({ id: 'proj-a', name: 'Project A' }),
-        createTestProject({ id: 'proj-b', name: 'Project B' }),
-        createTestProject({ id: 'proj-c', name: 'Project C' })
-      ];
-
       const selectedProjectId = 'proj-c';
       mockOnProjectSelect(selectedProjectId);
 
@@ -207,18 +191,8 @@ describe('ProjectTabBar', () => {
 
   describe('Project Closing', () => {
     it('should call onProjectClose with correct project ID when close button is clicked', () => {
-      const projects = [
-        createTestProject({ id: 'proj-1', name: 'Project 1' }),
-        createTestProject({ id: 'proj-2', name: 'Project 2' })
-      ];
-
       // Simulate clicking close button for project 1
       const closedProjectId = 'proj-1';
-
-      // Create mock event
-      const mockEvent = {
-        stopPropagation: vi.fn()
-      } as unknown as React.MouseEvent;
 
       mockOnProjectClose(closedProjectId);
 
@@ -375,8 +349,6 @@ describe('ProjectTabBar', () => {
     });
 
     it('should handle optional className prop', () => {
-      const projects = [createTestProject()];
-      const activeProjectId = projects[0].id;
       const customClassName = 'my-custom-class';
 
       // Optional prop should be handled correctly
@@ -454,8 +426,6 @@ describe('ProjectTabBar', () => {
     });
 
     it('should pass correct onSelect function that calls onProjectSelect with project ID', () => {
-      const projects = [createTestProject({ id: 'proj-callback' })];
-
       // Create the onSelect function that would be passed to SortableProjectTab
       const projectId = 'proj-callback';
       const onSelect = () => mockOnProjectSelect(projectId);
@@ -466,8 +436,6 @@ describe('ProjectTabBar', () => {
     });
 
     it('should pass correct onClose function that stops propagation and calls onProjectClose', () => {
-      const projects = [createTestProject({ id: 'proj-close' })];
-
       const mockEvent = {
         stopPropagation: vi.fn()
       } as unknown as React.MouseEvent;
@@ -487,9 +455,6 @@ describe('ProjectTabBar', () => {
 
   describe('Control Props for Active Tab', () => {
     it('should accept onSettingsClick prop', () => {
-      const projects = [createTestProject({ id: 'proj-1', name: 'Project 1' })];
-      const activeProjectId = 'proj-1';
-
       // Control props interface verification
       const controlProps = {
         onSettingsClick: mockOnSettingsClick,
