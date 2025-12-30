@@ -378,6 +378,15 @@ class OrchestratorReviewer:
                             block_type = type(block).__name__
                             if hasattr(block, "text"):
                                 result_text += block.text
+                                # Print text content preview for logs
+                                text_preview = (
+                                    block.text[:500].replace("\n", " ").strip()
+                                )
+                                if text_preview:
+                                    print(
+                                        f"[Orchestrator] AI response: {text_preview}{'...' if len(block.text) > 500 else ''}",
+                                        flush=True,
+                                    )
                                 logger.debug(
                                     f"[Orchestrator] Received text block (length: {len(block.text)})"
                                 )

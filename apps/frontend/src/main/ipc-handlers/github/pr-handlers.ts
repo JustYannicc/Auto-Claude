@@ -220,13 +220,14 @@ interface PRLogs {
  * Returns null if line is not a log line
  */
 function parseLogLine(line: string): { source: string; content: string; isError: boolean } | null {
-  // Match patterns like [Context], [AI], [Orchestrator], [Followup], [DEBUG ...], [ParallelFollowup], [BotDetector]
+  // Match patterns like [Context], [AI], [Orchestrator], [Followup], [DEBUG ...], [ParallelFollowup], [BotDetector], [ParallelOrchestrator]
   const patterns = [
     /^\[Context\]\s*(.*)$/,
     /^\[AI\]\s*(.*)$/,
     /^\[Orchestrator\]\s*(.*)$/,
     /^\[Followup\]\s*(.*)$/,
     /^\[ParallelFollowup\]\s*(.*)$/,
+    /^\[ParallelOrchestrator\]\s*(.*)$/,
     /^\[BotDetector\]\s*(.*)$/,
     /^\[DEBUG\s+(\w+)\]\s*(.*)$/,
     /^\[ERROR\s+(\w+)\]\s*(.*)$/,
@@ -237,6 +238,10 @@ function parseLogLine(line: string): { source: string; content: string; isError:
     if (match) {
       const isDebugOrError = pattern.source.includes('DEBUG') || pattern.source.includes('ERROR');
       if (isDebugOrError && match.length >= 3) {
+        // Skip debug messages that only show message types (not useful)
+        if (match[2].match(/^Message #\d+: \w+Message/)) {
+          return null;
+        }
         return {
           source: match[1],
           content: match[2],
@@ -269,8 +274,8 @@ function parseLogLine(line: string): { source: string; content: string; isError:
  * Determine the phase from source
  */
 function getPhaseFromSource(source: string): PRLogPhase {
-  const contextSources = ['Context', 'Followup', 'BotDetector'];
-  const analysisSources = ['AI', 'Orchestrator', 'ParallelFollowup', 'orchestrator'];
+  const contextSources = ['Context', 'BotDetector'];
+  const analysisSources = ['AI', 'Orchestrator', 'ParallelOrchestrator', 'ParallelFollowup', 'Followup', 'orchestrator'];
 
   if (contextSources.includes(source)) return 'context';
   if (analysisSources.includes(source)) return 'analysis';

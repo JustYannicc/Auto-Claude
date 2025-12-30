@@ -507,9 +507,13 @@ The SDK will run invoked agents in parallel automatically.
                         for block in msg.content:
                             if hasattr(block, "text"):
                                 result_text += block.text
-                                if DEBUG_MODE:
+                                # Always print text content preview (not just in DEBUG_MODE)
+                                text_preview = (
+                                    block.text[:500].replace("\n", " ").strip()
+                                )
+                                if text_preview:
                                     print(
-                                        f"[DEBUG ParallelFollowup] Text block: {len(block.text)} chars",
+                                        f"[ParallelFollowup] AI response: {text_preview}{'...' if len(block.text) > 500 else ''}",
                                         flush=True,
                                     )
                             if getattr(block, "name", "") == "StructuredOutput":

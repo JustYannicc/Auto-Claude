@@ -52,6 +52,7 @@ const SOURCE_COLORS: Record<string, string> = {
   'Context': 'bg-blue-500/20 text-blue-400',
   'AI': 'bg-purple-500/20 text-purple-400',
   'Orchestrator': 'bg-orange-500/20 text-orange-400',
+  'ParallelOrchestrator': 'bg-orange-500/20 text-orange-400',
   'Followup': 'bg-cyan-500/20 text-cyan-400',
   'ParallelFollowup': 'bg-cyan-500/20 text-cyan-400',
   'BotDetector': 'bg-amber-500/20 text-amber-400',
