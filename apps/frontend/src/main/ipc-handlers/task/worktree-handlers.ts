@@ -1495,7 +1495,7 @@ export function registerWorktreeHandlers(
               // Utility feature settings for merge resolver
               UTILITY_MODEL: utilitySettings.model,
               UTILITY_MODEL_ID: utilitySettings.modelId,
-              UTILITY_THINKING_BUDGET: utilitySettings.thinkingBudget === null ? '0' : (utilitySettings.thinkingBudget?.toString() || '')
+              UTILITY_THINKING_BUDGET: utilitySettings.thinkingBudget === null ? '' : (utilitySettings.thinkingBudget?.toString() || '')
             },
             stdio: ['ignore', 'pipe', 'pipe'] // Don't connect stdin to avoid blocking
           });

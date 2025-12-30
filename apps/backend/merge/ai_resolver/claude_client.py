@@ -58,13 +58,20 @@ def create_claude_resolver() -> AIResolver:
     # Read model settings from environment (passed from frontend)
     model = os.environ.get("UTILITY_MODEL_ID", DEFAULT_MERGE_MODEL)
     thinking_budget_str = os.environ.get("UTILITY_THINKING_BUDGET", "")
-    try:
-        thinking_budget = int(thinking_budget_str) if thinking_budget_str else 1024
-    except ValueError:
-        logger.warning(
-            f"Invalid UTILITY_THINKING_BUDGET value '{thinking_budget_str}', using default 1024"
-        )
-        thinking_budget = 1024
+
+    # Parse thinking budget: empty string = disabled (None), number = budget tokens
+    thinking_budget: int | None
+    if not thinking_budget_str:
+        # Empty string means "none" level - disable extended thinking
+        thinking_budget = None
+    else:
+        try:
+            thinking_budget = int(thinking_budget_str)
+        except ValueError:
+            logger.warning(
+                f"Invalid UTILITY_THINKING_BUDGET value '{thinking_budget_str}', using default 1024"
+            )
+            thinking_budget = 1024
 
     logger.info(
         f"Merge resolver using model={model}, thinking_budget={thinking_budget}"
