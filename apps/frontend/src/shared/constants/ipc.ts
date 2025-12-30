@@ -463,5 +463,9 @@ export const IPC_CHANNELS = {
   DEBUG_OPEN_LOGS_FOLDER: 'debug:openLogsFolder',
   DEBUG_COPY_DEBUG_INFO: 'debug:copyDebugInfo',
   DEBUG_GET_RECENT_ERRORS: 'debug:getRecentErrors',
-  DEBUG_LIST_LOG_FILES: 'debug:listLogFiles'
+  DEBUG_LIST_LOG_FILES: 'debug:listLogFiles',
+
+  // Claude Code CLI operations
+  CLAUDE_CODE_CHECK_VERSION: 'claudeCode:checkVersion',
+  CLAUDE_CODE_INSTALL: 'claudeCode:install'
 } as const;

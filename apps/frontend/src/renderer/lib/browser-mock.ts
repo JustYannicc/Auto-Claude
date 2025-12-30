@@ -172,6 +172,28 @@ const browserMockAPI: ElectronAPI = {
     onAnalyzePreviewError: () => () => {}
   },
 
+  // Claude Code Operations
+  checkClaudeCodeVersion: async () => ({
+    success: true,
+    data: {
+      installed: '1.0.0',
+      latest: '1.0.0',
+      isOutdated: false,
+      path: '/usr/local/bin/claude',
+      detectionResult: {
+        found: true,
+        version: '1.0.0',
+        path: '/usr/local/bin/claude',
+        source: 'system-path' as const,
+        message: 'Claude Code CLI found'
+      }
+    }
+  }),
+  installClaudeCode: async () => ({
+    success: true,
+    data: { command: 'npm install -g @anthropic-ai/claude-code' }
+  }),
+
   // Debug Operations
   getDebugInfo: async () => ({
     systemInfo: {

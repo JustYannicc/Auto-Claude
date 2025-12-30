@@ -49,6 +49,7 @@ import { useSettingsStore } from '../stores/settings-store';
 import { AddProjectModal } from './AddProjectModal';
 import { GitSetupModal } from './GitSetupModal';
 import { RateLimitIndicator } from './RateLimitIndicator';
+import { ClaudeCodeStatusBadge } from './ClaudeCodeStatusBadge';
 import type { Project, AutoBuildVersionInfo, GitStatus } from '../../shared/types';
 
 export type SidebarView = 'kanban' | 'terminals' | 'roadmap' | 'context' | 'ideation' | 'github-issues' | 'gitlab-issues' | 'github-prs' | 'gitlab-merge-requests' | 'changelog' | 'insights' | 'worktrees' | 'agent-tools';
@@ -296,6 +297,9 @@ export function Sidebar({
 
         {/* Bottom section with Settings, Help, and New Task */}
         <div className="p-4 space-y-3">
+          {/* Claude Code Status Badge */}
+          <ClaudeCodeStatusBadge />
+
           {/* Settings and Help row */}
           <div className="flex items-center gap-2">
             <Tooltip>
