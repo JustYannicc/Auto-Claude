@@ -212,7 +212,10 @@
     "findingsNeedPosting": "{{count}} résultat doit être publié sur GitHub.",
     "findingsNeedPosting_plural": "{{count}} résultats doivent être publiés sur GitHub.",
     "findingsFoundSelectPost": "{{count}} résultat trouvé. Sélectionnez et publiez sur GitHub.",
-    "findingsFoundSelectPost_plural": "{{count}} résultats trouvés. Sélectionnez et publiez sur GitHub."
+    "findingsFoundSelectPost_plural": "{{count}} résultats trouvés. Sélectionnez et publiez sur GitHub.",
+    "reviewLogs": "Journaux de révision",
+    "followup": "Suivi",
+    "initial": "Initial"
   },
   "downloads": {
     "toggleExpand": "Afficher/masquer les détails",

@@ -266,6 +266,19 @@ AGENT_CONFIGS = {
         "auto_claude_tools": [],
         "thinking_default": "high",
     },
+    "pr_orchestrator_parallel": {
+        "tools": BASE_READ_TOOLS + WEB_TOOLS,  # Read-only for parallel PR orchestrator
+        "mcp_servers": ["context7"],
+        "auto_claude_tools": [],
+        "thinking_default": "high",
+    },
+    "pr_followup_parallel": {
+        "tools": BASE_READ_TOOLS
+        + WEB_TOOLS,  # Read-only for parallel followup reviewer
+        "mcp_servers": ["context7"],
+        "auto_claude_tools": [],
+        "thinking_default": "high",
+    },
     # ═══════════════════════════════════════════════════════════════════════
     # ANALYSIS PHASES
     # ═══════════════════════════════════════════════════════════════════════

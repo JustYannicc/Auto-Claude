@@ -277,12 +277,16 @@ class GitHubOrchestrator:
     # PR REVIEW WORKFLOW
     # =========================================================================
 
-    async def review_pr(self, pr_number: int) -> PRReviewResult:
+    async def review_pr(
+        self, pr_number: int, force_review: bool = False
+    ) -> PRReviewResult:
         """
         Perform AI-powered review of a pull request.
 
         Args:
             pr_number: The PR number to review
+            force_review: If True, bypass the "already reviewed" check and force a new review.
+                         Useful for re-validating a PR or testing the review system.
 
         Returns:
             PRReviewResult with findings and overall assessment
@@ -321,11 +325,34 @@ class GitHubOrchestrator:
                 commits=pr_context.commits,
             )
 
+            # Allow forcing a review to bypass "already reviewed" check
+            if should_skip and force_review and "Already reviewed" in skip_reason:
+                print(
+                    f"[BOT DETECTION] Force review requested - bypassing: {skip_reason}",
+                    flush=True,
+                )
+                should_skip = False
+
             if should_skip:
                 print(
                     f"[BOT DETECTION] Skipping PR #{pr_number}: {skip_reason}",
                     flush=True,
                 )
+
+                # If skipping because "Already reviewed", return the existing review
+                # instead of creating a new empty "skipped" result
+                if "Already reviewed" in skip_reason:
+                    existing_review = PRReviewResult.load(self.github_dir, pr_number)
+                    if existing_review:
+                        print(
+                            "[BOT DETECTION] Returning existing review (no new commits)",
+                            flush=True,
+                        )
+                        # Don't overwrite - return the existing review as-is
+                        # The frontend will see "no new commits" via the newCommitsCheck
+                        return existing_review
+
+                # For other skip reasons (bot-authored, cooling off), create a skip result
                 result = PRReviewResult(
                     pr_number=pr_number,
                     repo=self.config.repo,
@@ -534,6 +561,30 @@ class GitHubOrchestrator:
                 previous_review,
             )
             followup_context = await gatherer.gather()
+
+            # Check if context gathering failed
+            if followup_context.error:
+                print(
+                    f"[Followup] Context gathering failed: {followup_context.error}",
+                    flush=True,
+                )
+                # Return an error result instead of silently returning incomplete data
+                result = PRReviewResult(
+                    pr_number=pr_number,
+                    repo=self.config.repo,
+                    success=False,
+                    findings=[],
+                    summary=f"Follow-up review failed: {followup_context.error}",
+                    overall_status="comment",
+                    verdict=MergeVerdict.NEEDS_REVISION,
+                    verdict_reasoning=f"Context gathering failed: {followup_context.error}",
+                    error=followup_context.error,
+                    reviewed_commit_sha=followup_context.current_commit_sha
+                    or previous_review.reviewed_commit_sha,
+                    is_followup_review=True,
+                )
+                await result.save(self.github_dir)
+                return result
 
             # Check if there are new commits
             if not followup_context.commits_since_review:

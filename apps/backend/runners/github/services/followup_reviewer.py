@@ -305,9 +305,9 @@ class FollowupReviewer:
                 resolved.append(finding)
             else:
                 # File was modified but the specific line wasn't clearly changed
-                # Consider it potentially resolved (benefit of the doubt)
-                # Could be more sophisticated with AST analysis
-                resolved.append(finding)
+                # Mark as unresolved - the contributor needs to address the actual issue
+                # "Benefit of the doubt" was wrong - if the line wasn't changed, the issue persists
+                unresolved.append(finding)
 
         return resolved, unresolved
 

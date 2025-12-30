@@ -350,6 +350,9 @@ export const IPC_CHANNELS = {
   GITHUB_PR_REVIEW_COMPLETE: 'github:pr:reviewComplete',
   GITHUB_PR_REVIEW_ERROR: 'github:pr:reviewError',
 
+  // GitHub PR Logs (for viewing AI review logs)
+  GITHUB_PR_GET_LOGS: 'github:pr:getLogs',
+
   // GitHub Issue Triage operations
   GITHUB_TRIAGE_RUN: 'github:triage:run',
   GITHUB_TRIAGE_GET_RESULTS: 'github:triage:getResults',

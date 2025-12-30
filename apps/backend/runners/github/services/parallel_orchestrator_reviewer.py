@@ -23,6 +23,8 @@ import os
 from pathlib import Path
 from typing import Any
 
+from claude_agent_sdk import AgentDefinition
+
 try:
     from ...core.client import create_client
     from ...phase_config import get_thinking_budget
@@ -147,7 +149,7 @@ class ParallelOrchestratorReviewer:
         logger.warning(f"Prompt file not found: {prompt_file}")
         return ""
 
-    def _define_specialist_agents(self) -> dict[str, dict[str, Any]]:
+    def _define_specialist_agents(self) -> dict[str, AgentDefinition]:
         """
         Define specialist agents for the SDK.
 
@@ -156,6 +158,8 @@ class ParallelOrchestratorReviewer:
         - prompt: System prompt for the agent
         - tools: Tools the agent can use (read-only for PR review)
         - model: "inherit" = use same model as orchestrator (user's choice)
+
+        Returns AgentDefinition dataclass instances as required by the SDK.
         """
         # Load agent prompts from files
         security_prompt = self._load_prompt("pr_security_agent.md")
@@ -165,62 +169,62 @@ class ParallelOrchestratorReviewer:
         ai_triage_prompt = self._load_prompt("pr_ai_triage.md")
 
         return {
-            "security-reviewer": {
-                "description": (
+            "security-reviewer": AgentDefinition(
+                description=(
                     "Security specialist. Use for OWASP Top 10, authentication, "
                     "injection, cryptographic issues, and sensitive data exposure. "
                     "Invoke when PR touches auth, API endpoints, user input, database queries, "
                     "or file operations."
                 ),
-                "prompt": security_prompt
+                prompt=security_prompt
                 or "You are a security expert. Find vulnerabilities.",
-                "tools": ["Read", "Grep", "Glob"],
-                "model": "inherit",
-            },
-            "quality-reviewer": {
-                "description": (
+                tools=["Read", "Grep", "Glob"],
+                model="inherit",
+            ),
+            "quality-reviewer": AgentDefinition(
+                description=(
                     "Code quality expert. Use for complexity, duplication, error handling, "
                     "maintainability, and pattern adherence. Invoke when PR has complex logic, "
                     "large functions, or significant business logic changes."
                 ),
-                "prompt": quality_prompt
+                prompt=quality_prompt
                 or "You are a code quality expert. Find quality issues.",
-                "tools": ["Read", "Grep", "Glob"],
-                "model": "inherit",
-            },
-            "logic-reviewer": {
-                "description": (
+                tools=["Read", "Grep", "Glob"],
+                model="inherit",
+            ),
+            "logic-reviewer": AgentDefinition(
+                description=(
                     "Logic and correctness specialist. Use for algorithm verification, "
                     "edge cases, state management, and race conditions. Invoke when PR has "
                     "algorithmic changes, data transformations, concurrent operations, or bug fixes."
                 ),
-                "prompt": logic_prompt
+                prompt=logic_prompt
                 or "You are a logic expert. Find correctness issues.",
-                "tools": ["Read", "Grep", "Glob"],
-                "model": "inherit",
-            },
-            "codebase-fit-reviewer": {
-                "description": (
+                tools=["Read", "Grep", "Glob"],
+                model="inherit",
+            ),
+            "codebase-fit-reviewer": AgentDefinition(
+                description=(
                     "Codebase consistency expert. Use for naming conventions, ecosystem fit, "
                     "architectural alignment, and avoiding reinvention. Invoke when PR introduces "
                     "new patterns, large additions, or code that might duplicate existing functionality."
                 ),
-                "prompt": codebase_fit_prompt
+                prompt=codebase_fit_prompt
                 or "You are a codebase expert. Check for consistency.",
-                "tools": ["Read", "Grep", "Glob"],
-                "model": "inherit",
-            },
-            "ai-triage-reviewer": {
-                "description": (
+                tools=["Read", "Grep", "Glob"],
+                model="inherit",
+            ),
+            "ai-triage-reviewer": AgentDefinition(
+                description=(
                     "AI comment validator. Use for triaging comments from CodeRabbit, "
                     "Gemini Code Assist, Cursor, Greptile, and other AI reviewers. "
                     "Invoke when PR has existing AI review comments that need validation."
                 ),
-                "prompt": ai_triage_prompt
+                prompt=ai_triage_prompt
                 or "You are an AI triage expert. Validate AI comments.",
-                "tools": ["Read", "Grep", "Glob"],
-                "model": "inherit",
-            },
+                tools=["Read", "Grep", "Glob"],
+                model="inherit",
+            ),
         }
 
     def _build_orchestrator_prompt(self, context: PRContext) -> str:
@@ -314,7 +318,7 @@ The SDK will run invoked agents in parallel automatically.
         try:
             self._report_progress(
                 "orchestrating",
-                20,
+                35,
                 "Parallel orchestrator analyzing PR...",
                 pr_number=context.pr_number,
             )
@@ -356,7 +360,7 @@ The SDK will run invoked agents in parallel automatically.
 
             self._report_progress(
                 "orchestrating",
-                30,
+                40,
                 "Orchestrator delegating to specialist agents...",
                 pr_number=context.pr_number,
             )
@@ -365,6 +369,7 @@ The SDK will run invoked agents in parallel automatically.
             result_text = ""
             structured_output = None
             agents_invoked = []
+            msg_count = 0
 
             async with client:
                 await client.query(prompt)
@@ -373,9 +378,25 @@ The SDK will run invoked agents in parallel automatically.
                     f"[ParallelOrchestrator] Running orchestrator ({model})...",
                     flush=True,
                 )
+                if DEBUG_MODE:
+                    print(
+                        "[DEBUG ParallelOrchestrator] Sent query, awaiting response stream...",
+                        flush=True,
+                    )
 
                 async for msg in client.receive_response():
                     msg_type = type(msg).__name__
+                    msg_count += 1
+
+                    if DEBUG_MODE:
+                        # Log every message type for visibility
+                        msg_details = ""
+                        if hasattr(msg, "type"):
+                            msg_details = f" (type={msg.type})"
+                        print(
+                            f"[DEBUG ParallelOrchestrator] Message #{msg_count}: {msg_type}{msg_details}",
+                            flush=True,
+                        )
 
                     # Track thinking blocks
                     if msg_type == "ThinkingBlock" or (
@@ -384,17 +405,30 @@ The SDK will run invoked agents in parallel automatically.
                         thinking_text = getattr(msg, "thinking", "") or getattr(
                             msg, "text", ""
                         )
-                        if DEBUG_MODE and thinking_text:
+                        if thinking_text:
                             print(
-                                f"[ParallelOrchestrator] Thinking: {len(thinking_text)} chars",
+                                f"[ParallelOrchestrator] AI thinking: {len(thinking_text)} chars",
                                 flush=True,
                             )
+                            if DEBUG_MODE:
+                                # Show first 200 chars of thinking
+                                preview = thinking_text[:200].replace("\n", " ")
+                                print(
+                                    f"[DEBUG ParallelOrchestrator] Thinking preview: {preview}...",
+                                    flush=True,
+                                )
 
                     # Track subagent invocations (Task tool calls)
                     if msg_type == "ToolUseBlock" or (
                         hasattr(msg, "type") and msg.type == "tool_use"
                     ):
                         tool_name = getattr(msg, "name", "")
+                        if DEBUG_MODE:
+                            tool_id = getattr(msg, "id", "unknown")
+                            print(
+                                f"[DEBUG ParallelOrchestrator] Tool call: {tool_name} (id={tool_id})",
+                                flush=True,
+                            )
                         if tool_name == "Task":
                             # Extract which agent was invoked
                             tool_input = getattr(msg, "input", {})
@@ -412,12 +446,36 @@ The SDK will run invoked agents in parallel automatically.
                                     "[ParallelOrchestrator] Received structured output",
                                     flush=True,
                                 )
+                        elif DEBUG_MODE:
+                            # Log other tool calls in debug mode
+                            print(
+                                f"[DEBUG ParallelOrchestrator] Other tool: {tool_name}",
+                                flush=True,
+                            )
+
+                    # Track tool results
+                    if msg_type == "ToolResultBlock" or (
+                        hasattr(msg, "type") and msg.type == "tool_result"
+                    ):
+                        if DEBUG_MODE:
+                            tool_id = getattr(msg, "tool_use_id", "unknown")
+                            is_error = getattr(msg, "is_error", False)
+                            status = "ERROR" if is_error else "OK"
+                            print(
+                                f"[DEBUG ParallelOrchestrator] Tool result: {tool_id} [{status}]",
+                                flush=True,
+                            )
 
                     # Collect text output
                     if msg_type == "AssistantMessage" and hasattr(msg, "content"):
                         for block in msg.content:
                             if hasattr(block, "text"):
                                 result_text += block.text
+                                if DEBUG_MODE:
+                                    print(
+                                        f"[DEBUG ParallelOrchestrator] Text block: {len(block.text)} chars",
+                                        flush=True,
+                                    )
                             # Check for StructuredOutput in content
                             if getattr(block, "name", "") == "StructuredOutput":
                                 structured_data = getattr(block, "input", None)
@@ -427,6 +485,12 @@ The SDK will run invoked agents in parallel automatically.
                     # Check for structured_output attribute
                     if hasattr(msg, "structured_output") and msg.structured_output:
                         structured_output = msg.structured_output
+
+            if DEBUG_MODE:
+                print(
+                    f"[DEBUG ParallelOrchestrator] Session ended. Total messages: {msg_count}",
+                    flush=True,
+                )
 
             logger.info(
                 f"[ParallelOrchestrator] Session complete. Agents invoked: {agents_invoked}"
@@ -438,7 +502,7 @@ The SDK will run invoked agents in parallel automatically.
 
             self._report_progress(
                 "finalizing",
-                80,
+                50,
                 "Synthesizing findings...",
                 pr_number=context.pr_number,
             )
@@ -504,7 +568,10 @@ The SDK will run invoked agents in parallel automatically.
             )
 
             self._report_progress(
-                "complete", 100, "Review complete!", pr_number=context.pr_number
+                "analyzed",
+                60,
+                "Parallel analysis complete",
+                pr_number=context.pr_number,
             )
 
             return result

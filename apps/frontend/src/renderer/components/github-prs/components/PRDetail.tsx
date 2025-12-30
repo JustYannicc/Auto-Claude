@@ -12,6 +12,7 @@ import {
   AlertTriangle,
   CheckCheck,
   MessageSquare,
+  FileText,
 } from 'lucide-react';
 import { Badge } from '../../ui/badge';
 import { Button } from '../../ui/button';
@@ -25,9 +26,10 @@ import { CollapsibleCard } from './CollapsibleCard';
 import { ReviewStatusTree } from './ReviewStatusTree';
 import { PRHeader } from './PRHeader';
 import { ReviewFindings } from './ReviewFindings';
+import { PRLogs } from './PRLogs';
 
 import type { PRData, PRReviewResult, PRReviewProgress } from '../hooks/useGitHubPRs';
-import type { NewCommitsCheck } from '../../../../preload/api/modules/github-api';
+import type { NewCommitsCheck, PRLogs as PRLogsType } from '../../../../preload/api/modules/github-api';
 
 interface PRDetailProps {
   pr: PRData;
@@ -44,6 +46,7 @@ interface PRDetailProps {
   onPostComment: (body: string) => void;
   onMergePR: (mergeMethod?: 'merge' | 'squash' | 'rebase') => void;
   onAssignPR: (username: string) => void;
+  onGetLogs: () => Promise<PRLogsType | null>;
 }
 
 function getStatusColor(status: PRReviewResult['overallStatus']): string {
@@ -72,6 +75,7 @@ export function PRDetail({
   onPostComment,
   onMergePR,
   onAssignPR: _onAssignPR,
+  onGetLogs,
 }: PRDetailProps) {
   const { t, i18n } = useTranslation('common');
   // Selection state for findings
@@ -87,6 +91,11 @@ export function PRDetail({
   const checkNewCommitsAbortRef = useRef<AbortController | null>(null);
   // Ref to track checking state without causing callback recreation
   const isCheckingNewCommitsRef = useRef(false);
+  // Logs state
+  const [logsExpanded, setLogsExpanded] = useState(false);
+  const [prLogs, setPrLogs] = useState<PRLogsType | null>(null);
+  const [isLoadingLogs, setIsLoadingLogs] = useState(false);
+  const logsLoadedRef = useRef(false);
 
   // Sync with store's newCommitsCheck when it changes (e.g., when switching PRs)
   useEffect(() => {
@@ -114,8 +123,8 @@ export function PRDetail({
     }
   }, [reviewResult, postedFindingIds]);
 
-  // Check for new commits only when findings have been posted to GitHub
-  // Follow-up review only makes sense after initial findings are shared with the contributor
+  // Check for new commits after any review has been completed
+  // This allows detecting new work pushed after ANY review (initial or follow-up)
   const hasPostedFindings = postedFindingIds.size > 0 || reviewResult?.hasPostedFindings;
 
   const checkForNewCommits = useCallback(async () => {
@@ -130,8 +139,10 @@ export function PRDetail({
     }
     checkNewCommitsAbortRef.current = new AbortController();
 
-    // Only check for new commits if we have a review AND findings have been posted
-    if (reviewResult?.success && reviewResult.reviewedCommitSha && hasPostedFindings) {
+    // Check for new commits if we have ANY successful review with a commit SHA
+    // This includes follow-up reviews that resolved all issues (no new findings)
+    // New commits = new code that needs to be reviewed, regardless of posting status
+    if (reviewResult?.success && reviewResult.reviewedCommitSha) {
       isCheckingNewCommitsRef.current = true;
       try {
         const result = await onCheckNewCommits();
@@ -144,11 +155,8 @@ export function PRDetail({
           isCheckingNewCommitsRef.current = false;
         }
       }
-    } else {
-      // Clear any existing new commits check if we haven't posted yet
-      setNewCommitsCheck(null);
     }
-  }, [reviewResult, onCheckNewCommits, hasPostedFindings]);
+  }, [reviewResult, onCheckNewCommits]);
 
   useEffect(() => {
     checkForNewCommits();
@@ -167,6 +175,25 @@ export function PRDetail({
       return () => clearTimeout(timer);
     }
   }, [postSuccess]);
+
+  // Load logs when logs section is expanded
+  useEffect(() => {
+    if (logsExpanded && !logsLoadedRef.current && !isLoadingLogs) {
+      logsLoadedRef.current = true;
+      setIsLoadingLogs(true);
+      onGetLogs()
+        .then(logs => setPrLogs(logs))
+        .catch(() => setPrLogs(null))
+        .finally(() => setIsLoadingLogs(false));
+    }
+  }, [logsExpanded, onGetLogs, isLoadingLogs]);
+
+  // Reset logs state when PR changes
+  useEffect(() => {
+    logsLoadedRef.current = false;
+    setPrLogs(null);
+    setLogsExpanded(false);
+  }, [pr.number]);
 
   // Count selected findings by type for the button label
   const selectedCount = selectedFindingIds.size;
@@ -620,6 +647,29 @@ ${reviewResult.isFollowupReview ? `- Follow-up review: All previous blocking iss
               </div>
             </CardContent>
           </Card>
+        )}
+
+        {/* Review Logs */}
+        {reviewResult && (
+          <CollapsibleCard
+            title={t('prReview.reviewLogs')}
+            icon={<FileText className="h-4 w-4 text-muted-foreground" />}
+            badge={
+              prLogs ? (
+                <Badge variant="outline" className="text-xs">
+                  {prLogs.is_followup ? t('prReview.followup') : t('prReview.initial')}
+                </Badge>
+              ) : null
+            }
+            open={logsExpanded}
+            onOpenChange={setLogsExpanded}
+          >
+            <PRLogs
+              prNumber={pr.number}
+              logs={prLogs}
+              isLoading={isLoadingLogs}
+            />
+          </CollapsibleCard>
         )}
 
         {/* Description */}

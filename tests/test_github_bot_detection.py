@@ -13,8 +13,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-# Use direct file import to avoid package import issues
-_github_dir = Path(__file__).parent
+# Add the backend runners/github directory to path
+_backend_dir = Path(__file__).parent.parent / "apps" / "backend"
+_github_dir = _backend_dir / "runners" / "github"
 if str(_github_dir) not in sys.path:
     sys.path.insert(0, str(_github_dir))
 
@@ -247,10 +248,7 @@ class TestShouldSkipReview:
         # So commits[-1] is the LATEST commit - which is the bot commit
         commits = [
             {"author": {"login": "alice"}, "oid": "abc123"},  # Oldest commit (by alice)
-            {
-                "author": {"login": "test-bot"},
-                "oid": "def456",
-            },  # Latest commit (by bot)
+            {"author": {"login": "test-bot"}, "oid": "def456"},  # Latest commit (by bot)
         ]
 
         should_skip, reason = mock_bot_detector.should_skip_pr_review(

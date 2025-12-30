@@ -51,6 +51,9 @@ function PRStatusFlow({
 
   // Determine final status color for posted state
   let finalStatus: FinalStatus = 'success';
+  // ALWAYS show "Ready for Follow-up" if there are new commits since the last review
+  // This applies regardless of whether the last review was successful or not
+  // New commits = new code that needs to be reviewed, period
   if (hasNewCommits) {
     finalStatus = 'followup';
   } else if (hasBlockingFindings) {

@@ -22,10 +22,12 @@ import hashlib
 import logging
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..models import FollowupReviewContext
+
+from claude_agent_sdk import AgentDefinition
 
 try:
     from ...core.client import create_client
@@ -161,7 +163,7 @@ class ParallelFollowupReviewer:
         logger.warning(f"Prompt file not found: {prompt_file}")
         return ""
 
-    def _define_specialist_agents(self) -> dict[str, dict[str, Any]]:
+    def _define_specialist_agents(self) -> dict[str, AgentDefinition]:
         """
         Define specialist agents for follow-up review.
 
@@ -177,40 +179,40 @@ class ParallelFollowupReviewer:
         comment_prompt = self._load_prompt("pr_followup_comment_agent.md")
 
         return {
-            "resolution-verifier": {
-                "description": (
+            "resolution-verifier": AgentDefinition(
+                description=(
                     "Resolution verification specialist. Use to verify whether previous "
                     "findings have been addressed. Analyzes diffs to determine if issues "
                     "are truly fixed, partially fixed, or still unresolved. "
                     "Invoke when: There are previous findings to verify."
                 ),
-                "prompt": resolution_prompt
+                prompt=resolution_prompt
                 or "You verify whether previous findings are resolved.",
-                "tools": ["Read", "Grep", "Glob"],
-                "model": "inherit",
-            },
-            "new-code-reviewer": {
-                "description": (
+                tools=["Read", "Grep", "Glob"],
+                model="inherit",
+            ),
+            "new-code-reviewer": AgentDefinition(
+                description=(
                     "New code analysis specialist. Reviews code added since last review "
                     "for security, logic, quality issues, and regressions. "
                     "Invoke when: There are substantial code changes (>50 lines diff) or "
                     "changes to security-sensitive areas."
                 ),
-                "prompt": newcode_prompt or "You review new code for issues.",
-                "tools": ["Read", "Grep", "Glob"],
-                "model": "inherit",
-            },
-            "comment-analyzer": {
-                "description": (
+                prompt=newcode_prompt or "You review new code for issues.",
+                tools=["Read", "Grep", "Glob"],
+                model="inherit",
+            ),
+            "comment-analyzer": AgentDefinition(
+                description=(
                     "Comment and feedback analyst. Processes contributor comments and "
                     "AI tool reviews (CodeRabbit, Cursor, Gemini, etc.) to identify "
                     "unanswered questions and valid concerns. "
                     "Invoke when: There are comments or formal reviews since last review."
                 ),
-                "prompt": comment_prompt or "You analyze comments and feedback.",
-                "tools": ["Read", "Grep", "Glob"],
-                "model": "inherit",
-            },
+                prompt=comment_prompt or "You analyze comments and feedback.",
+                tools=["Read", "Grep", "Glob"],
+                model="inherit",
+            ),
         }
 
     def _format_previous_findings(self, context: FollowupReviewContext) -> str:
@@ -354,7 +356,7 @@ The SDK will run invoked agents in parallel automatically.
         try:
             self._report_progress(
                 "orchestrating",
-                20,
+                35,
                 "Parallel orchestrator analyzing follow-up...",
                 pr_number=context.pr_number,
             )
@@ -395,7 +397,7 @@ The SDK will run invoked agents in parallel automatically.
 
             self._report_progress(
                 "orchestrating",
-                30,
+                40,
                 "Orchestrator delegating to specialist agents...",
                 pr_number=context.pr_number,
             )
@@ -404,6 +406,7 @@ The SDK will run invoked agents in parallel automatically.
             result_text = ""
             structured_output = None
             agents_invoked = []
+            msg_count = 0
 
             async with client:
                 await client.query(prompt)
@@ -412,9 +415,25 @@ The SDK will run invoked agents in parallel automatically.
                     f"[ParallelFollowup] Running orchestrator ({model})...",
                     flush=True,
                 )
+                if DEBUG_MODE:
+                    print(
+                        "[DEBUG ParallelFollowup] Sent query, awaiting response stream...",
+                        flush=True,
+                    )
 
                 async for msg in client.receive_response():
                     msg_type = type(msg).__name__
+                    msg_count += 1
+
+                    if DEBUG_MODE:
+                        # Log every message type for visibility
+                        msg_details = ""
+                        if hasattr(msg, "type"):
+                            msg_details = f" (type={msg.type})"
+                        print(
+                            f"[DEBUG ParallelFollowup] Message #{msg_count}: {msg_type}{msg_details}",
+                            flush=True,
+                        )
 
                     # Track thinking blocks
                     if msg_type == "ThinkingBlock" or (
@@ -423,17 +442,30 @@ The SDK will run invoked agents in parallel automatically.
                         thinking_text = getattr(msg, "thinking", "") or getattr(
                             msg, "text", ""
                         )
-                        if DEBUG_MODE and thinking_text:
+                        if thinking_text:
                             print(
-                                f"[ParallelFollowup] Thinking: {len(thinking_text)} chars",
+                                f"[ParallelFollowup] AI thinking: {len(thinking_text)} chars",
                                 flush=True,
                             )
+                            if DEBUG_MODE:
+                                # Show first 200 chars of thinking
+                                preview = thinking_text[:200].replace("\n", " ")
+                                print(
+                                    f"[DEBUG ParallelFollowup] Thinking preview: {preview}...",
+                                    flush=True,
+                                )
 
                     # Track subagent invocations (Task tool calls)
                     if msg_type == "ToolUseBlock" or (
                         hasattr(msg, "type") and msg.type == "tool_use"
                     ):
                         tool_name = getattr(msg, "name", "")
+                        if DEBUG_MODE:
+                            tool_id = getattr(msg, "id", "unknown")
+                            print(
+                                f"[DEBUG ParallelFollowup] Tool call: {tool_name} (id={tool_id})",
+                                flush=True,
+                            )
                         if tool_name == "Task":
                             tool_input = getattr(msg, "input", {})
                             agent_name = tool_input.get("subagent_type", "unknown")
@@ -450,12 +482,36 @@ The SDK will run invoked agents in parallel automatically.
                                     "[ParallelFollowup] Received structured output",
                                     flush=True,
                                 )
+                        elif DEBUG_MODE:
+                            # Log other tool calls in debug mode
+                            print(
+                                f"[DEBUG ParallelFollowup] Other tool: {tool_name}",
+                                flush=True,
+                            )
+
+                    # Track tool results
+                    if msg_type == "ToolResultBlock" or (
+                        hasattr(msg, "type") and msg.type == "tool_result"
+                    ):
+                        if DEBUG_MODE:
+                            tool_id = getattr(msg, "tool_use_id", "unknown")
+                            is_error = getattr(msg, "is_error", False)
+                            status = "ERROR" if is_error else "OK"
+                            print(
+                                f"[DEBUG ParallelFollowup] Tool result: {tool_id} [{status}]",
+                                flush=True,
+                            )
 
                     # Collect text output
                     if msg_type == "AssistantMessage" and hasattr(msg, "content"):
                         for block in msg.content:
                             if hasattr(block, "text"):
                                 result_text += block.text
+                                if DEBUG_MODE:
+                                    print(
+                                        f"[DEBUG ParallelFollowup] Text block: {len(block.text)} chars",
+                                        flush=True,
+                                    )
                             if getattr(block, "name", "") == "StructuredOutput":
                                 structured_data = getattr(block, "input", None)
                                 if structured_data:
@@ -464,6 +520,12 @@ The SDK will run invoked agents in parallel automatically.
                     # Check for structured_output attribute
                     if hasattr(msg, "structured_output") and msg.structured_output:
                         structured_output = msg.structured_output
+
+            if DEBUG_MODE:
+                print(
+                    f"[DEBUG ParallelFollowup] Session ended. Total messages: {msg_count}",
+                    flush=True,
+                )
 
             logger.info(
                 f"[ParallelFollowup] Session complete. Agents invoked: {agents_invoked}"
@@ -475,7 +537,7 @@ The SDK will run invoked agents in parallel automatically.
 
             self._report_progress(
                 "finalizing",
-                80,
+                50,
                 "Synthesizing follow-up findings...",
                 pr_number=context.pr_number,
             )
@@ -522,6 +584,12 @@ The SDK will run invoked agents in parallel automatically.
             else:
                 overall_status = "approve"
 
+            # Generate blockers from critical/high severity findings
+            blockers = []
+            for finding in unique_findings:
+                if finding.severity in (ReviewSeverity.CRITICAL, ReviewSeverity.HIGH):
+                    blockers.append(f"{finding.category.value}: {finding.title}")
+
             result = PRReviewResult(
                 pr_number=context.pr_number,
                 repo=self.config.repo,
@@ -531,19 +599,20 @@ The SDK will run invoked agents in parallel automatically.
                 overall_status=overall_status,
                 verdict=verdict,
                 verdict_reasoning=verdict_reasoning,
-                blockers=[],
+                blockers=blockers,
                 reviewed_commit_sha=context.current_commit_sha,
                 is_followup_review=True,
-                previous_review_id=context.previous_review.pr_number,
+                previous_review_id=context.previous_review.review_id
+                or context.previous_review.pr_number,
                 resolved_findings=resolved_ids,
                 unresolved_findings=unresolved_ids,
                 new_findings_since_last_review=new_finding_ids,
             )
 
             self._report_progress(
-                "complete",
-                100,
-                "Follow-up review complete!",
+                "analyzed",
+                60,
+                "Follow-up analysis complete",
                 pr_number=context.pr_number,
             )
 
@@ -584,10 +653,11 @@ The SDK will run invoked agents in parallel automatically.
             for rv in response.resolution_verifications:
                 if rv.status == "resolved":
                     resolved_ids.append(rv.finding_id)
-                elif rv.status in ("unresolved", "partially_resolved"):
+                elif rv.status in ("unresolved", "partially_resolved", "cant_verify"):
+                    # Include "cant_verify" as unresolved - if we can't verify, assume not fixed
                     unresolved_ids.append(rv.finding_id)
                     # Add unresolved as a finding
-                    if rv.status == "unresolved":
+                    if rv.status in ("unresolved", "cant_verify"):
                         # Find original finding
                         original = next(
                             (

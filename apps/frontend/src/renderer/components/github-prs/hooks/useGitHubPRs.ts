@@ -123,16 +123,18 @@ export function useGitHubPRs(projectId?: string): UseGitHubPRsResult {
             // Wait for all preloads to complete, then check for new commits
             const preloadResults = await Promise.all(preloadPromises);
 
-            // Check for new commits on PRs that have posted findings
-            const prsWithPostedFindings = preloadResults.filter(
+            // Check for new commits on PRs that have been reviewed
+            // (either has reviewedCommitSha or the snake_case variant from older reviews)
+            const prsWithReviews = preloadResults.filter(
               (r): r is { prNumber: number; reviewResult: PRReviewResult } =>
-                r !== null && r.reviewResult?.hasPostedFindings === true && !!r.reviewResult?.reviewedCommitSha
+                r !== null &&
+                (!!r.reviewResult?.reviewedCommitSha || !!(r.reviewResult as any)?.reviewed_commit_sha)
             );
 
-            if (prsWithPostedFindings.length > 0) {
-              // Check new commits in parallel for all PRs with posted findings
+            if (prsWithReviews.length > 0) {
+              // Check new commits in parallel for all reviewed PRs
               await Promise.all(
-                prsWithPostedFindings.map(async ({ prNumber }) => {
+                prsWithReviews.map(async ({ prNumber }) => {
                   try {
                     const newCommitsResult = await window.electronAPI.github.checkNewCommits(projectId, prNumber);
                     usePRReviewStore.getState().setNewCommitsCheck(projectId, prNumber, newCommitsResult);
