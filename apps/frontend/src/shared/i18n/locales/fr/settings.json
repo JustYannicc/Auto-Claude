@@ -317,6 +317,16 @@
     "projectNotInitializedDescription": "Initialisez Auto Claude pour ce projet pour configurer les serveurs MCP.",
     "browserAutomation": "Automatisation navigateur (agents QA uniquement)",
     "alwaysEnabled": "toujours activé",
+    "addServer": "Ajouter un serveur",
+    "addMcpTo": "Ajouter un serveur MCP à {{agent}}",
+    "addMcpDescription": "Sélectionnez un serveur MCP à ajouter à cet agent",
+    "allMcpsAdded": "Tous les serveurs MCP disponibles sont déjà ajoutés",
+    "added": "ajouté",
+    "removed": "supprimé",
+    "remove": "Supprimer",
+    "restore": "Restaurer",
+    "noMcpServers": "Aucun serveur MCP",
+    "cannotRemove": "Impossible à supprimer (requis)",
     "servers": {
       "context7": {
         "name": "Context7",

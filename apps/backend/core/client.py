@@ -44,6 +44,8 @@ def load_project_mcp_config(project_dir: Path) -> dict:
     - LINEAR_MCP_ENABLED (default: true)
     - ELECTRON_MCP_ENABLED (default: false)
     - PUPPETEER_MCP_ENABLED (default: false)
+    - AGENT_MCP_<agent>_ADD (per-agent MCP additions)
+    - AGENT_MCP_<agent>_REMOVE (per-agent MCP removals)
 
     Args:
         project_dir: Path to the project directory
@@ -72,8 +74,13 @@ def load_project_mcp_config(project_dir: Path) -> dict:
                 if "=" in line:
                     key, value = line.split("=", 1)
                     key = key.strip()
+                    value = value.strip().strip("\"'")
+                    # Include global MCP toggles
                     if key in mcp_keys:
-                        config[key] = value.strip().strip("\"'")
+                        config[key] = value
+                    # Include per-agent MCP overrides (AGENT_MCP_<agent>_ADD/REMOVE)
+                    elif key.startswith("AGENT_MCP_"):
+                        config[key] = value
     except Exception:
         pass
 

@@ -337,6 +337,28 @@ def get_agent_config(agent_type: str) -> dict:
     return AGENT_CONFIGS[agent_type]
 
 
+def _map_mcp_server_name(name: str) -> str | None:
+    """
+    Map user-friendly MCP server names to internal identifiers.
+
+    Args:
+        name: User-provided MCP server name
+
+    Returns:
+        Internal server identifier or None if not recognized
+    """
+    mappings = {
+        "context7": "context7",
+        "graphiti-memory": "graphiti",
+        "graphiti": "graphiti",
+        "linear": "linear",
+        "electron": "electron",
+        "puppeteer": "puppeteer",
+        "auto-claude": "auto-claude",
+    }
+    return mappings.get(name.lower().strip())
+
+
 def get_required_mcp_servers(
     agent_type: str,
     project_capabilities: dict | None = None,
@@ -351,6 +373,7 @@ def get_required_mcp_servers(
     - "linear" → only if in mcp_servers_optional AND linear_enabled is True
     - "graphiti" → only if GRAPHITI_MCP_URL is set
     - Respects per-project MCP config overrides from .auto-claude/.env
+    - Applies per-agent ADD/REMOVE overrides from AGENT_MCP_<agent>_ADD/REMOVE
 
     Args:
         agent_type: The agent type identifier
@@ -358,7 +381,7 @@ def get_required_mcp_servers(
         linear_enabled: Whether Linear integration is enabled for this project
         mcp_config: Per-project MCP server toggles from .auto-claude/.env
                    Keys: CONTEXT7_ENABLED, LINEAR_MCP_ENABLED, ELECTRON_MCP_ENABLED,
-                         PUPPETEER_MCP_ENABLED (values: 'true'/'false' strings)
+                         PUPPETEER_MCP_ENABLED, AGENT_MCP_<agent>_ADD/REMOVE
 
     Returns:
         List of MCP server names to start
@@ -409,6 +432,28 @@ def get_required_mcp_servers(
     if "graphiti" in servers:
         if not os.environ.get("GRAPHITI_MCP_URL"):
             servers = [s for s in servers if s != "graphiti"]
+
+    # ========== Apply per-agent MCP overrides ==========
+    # Format: AGENT_MCP_<agent_type>_ADD=server1,server2
+    #         AGENT_MCP_<agent_type>_REMOVE=server1,server2
+    add_key = f"AGENT_MCP_{agent_type}_ADD"
+    remove_key = f"AGENT_MCP_{agent_type}_REMOVE"
+
+    # Process additions
+    if add_key in mcp_config:
+        additions = [s.strip() for s in mcp_config[add_key].split(",") if s.strip()]
+        for server in additions:
+            mapped = _map_mcp_server_name(server)
+            if mapped and mapped not in servers:
+                servers.append(mapped)
+
+    # Process removals (but never remove auto-claude)
+    if remove_key in mcp_config:
+        removals = [s.strip() for s in mcp_config[remove_key].split(",") if s.strip()]
+        for server in removals:
+            mapped = _map_mcp_server_name(server)
+            if mapped and mapped != "auto-claude":  # auto-claude cannot be removed
+                servers = [s for s in servers if s != mapped]
 
     return servers
 

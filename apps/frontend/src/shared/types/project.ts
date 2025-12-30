@@ -325,6 +325,28 @@ export interface ProjectEnvConfig {
     /** Puppeteer browser automation (QA only) - default: false */
     puppeteerEnabled?: boolean;
   };
+
+  // Per-agent MCP overrides (add/remove MCPs from specific agents)
+  agentMcpOverrides?: AgentMcpOverrides;
+}
+
+/**
+ * Per-agent MCP override configuration.
+ * Stored in .auto-claude/.env as AGENT_MCP_<agent>_ADD and AGENT_MCP_<agent>_REMOVE
+ */
+export interface AgentMcpOverride {
+  /** MCP servers to add beyond the agent's defaults */
+  add?: string[];
+  /** MCP servers to remove from the agent's defaults */
+  remove?: string[];
+}
+
+/**
+ * Map of agent type to their MCP overrides.
+ * Agent types match backend AGENT_CONFIGS keys (e.g., 'planner', 'coder', 'qa_reviewer')
+ */
+export interface AgentMcpOverrides {
+  [agentType: string]: AgentMcpOverride;
 }
 
 // Auto Claude Initialization Types

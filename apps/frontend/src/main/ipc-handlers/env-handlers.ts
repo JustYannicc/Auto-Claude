@@ -126,6 +126,26 @@ export function registerEnvHandlers(
       // Note: graphitiEnabled is already handled via GRAPHITI_ENABLED above
     }
 
+    // Per-agent MCP overrides (add/remove MCPs from specific agents)
+    if (config.agentMcpOverrides) {
+      // First, clear any existing AGENT_MCP_* entries
+      Object.keys(existingVars).forEach(key => {
+        if (key.startsWith('AGENT_MCP_')) {
+          delete existingVars[key];
+        }
+      });
+
+      // Add new overrides
+      Object.entries(config.agentMcpOverrides).forEach(([agentId, override]) => {
+        if (override.add && override.add.length > 0) {
+          existingVars[`AGENT_MCP_${agentId}_ADD`] = override.add.join(',');
+        }
+        if (override.remove && override.remove.length > 0) {
+          existingVars[`AGENT_MCP_${agentId}_REMOVE`] = override.remove.join(',');
+        }
+      });
+    }
+
     // Generate content with sections
     const content = `# Auto Claude Framework Environment Variables
 # Managed by Auto Claude UI
@@ -174,6 +194,17 @@ ${existingVars['LINEAR_MCP_ENABLED'] !== undefined ? `LINEAR_MCP_ENABLED=${exist
 ${existingVars['ELECTRON_MCP_ENABLED'] !== undefined ? `ELECTRON_MCP_ENABLED=${existingVars['ELECTRON_MCP_ENABLED']}` : '# ELECTRON_MCP_ENABLED=false'}
 # Puppeteer browser automation - QA agents only (default: disabled)
 ${existingVars['PUPPETEER_MCP_ENABLED'] !== undefined ? `PUPPETEER_MCP_ENABLED=${existingVars['PUPPETEER_MCP_ENABLED']}` : '# PUPPETEER_MCP_ENABLED=false'}
+
+# =============================================================================
+# PER-AGENT MCP OVERRIDES
+# Add or remove MCP servers for specific agents
+# Format: AGENT_MCP_<agent_type>_ADD=server1,server2
+# Format: AGENT_MCP_<agent_type>_REMOVE=server1,server2
+# =============================================================================
+${Object.entries(existingVars)
+  .filter(([key]) => key.startsWith('AGENT_MCP_'))
+  .map(([key, value]) => `${key}=${value}`)
+  .join('\n') || '# No per-agent overrides configured'}
 
 # =============================================================================
 # MEMORY INTEGRATION
@@ -369,6 +400,24 @@ ${existingVars['GRAPHITI_DB_PATH'] ? `GRAPHITI_DB_PATH=${existingVars['GRAPHITI_
         electronEnabled: vars['ELECTRON_MCP_ENABLED']?.toLowerCase() === 'true', // default false
         puppeteerEnabled: vars['PUPPETEER_MCP_ENABLED']?.toLowerCase() === 'true', // default false
       };
+
+      // Parse per-agent MCP overrides (AGENT_MCP_<agent>_ADD/REMOVE)
+      const agentMcpOverrides: Record<string, { add?: string[]; remove?: string[] }> = {};
+      Object.entries(vars).forEach(([key, value]) => {
+        if (key.startsWith('AGENT_MCP_') && key.endsWith('_ADD')) {
+          const agentId = key.replace('AGENT_MCP_', '').replace('_ADD', '');
+          if (!agentMcpOverrides[agentId]) agentMcpOverrides[agentId] = {};
+          agentMcpOverrides[agentId].add = value.split(',').map(s => s.trim()).filter(Boolean);
+        } else if (key.startsWith('AGENT_MCP_') && key.endsWith('_REMOVE')) {
+          const agentId = key.replace('AGENT_MCP_', '').replace('_REMOVE', '');
+          if (!agentMcpOverrides[agentId]) agentMcpOverrides[agentId] = {};
+          agentMcpOverrides[agentId].remove = value.split(',').map(s => s.trim()).filter(Boolean);
+        }
+      });
+
+      if (Object.keys(agentMcpOverrides).length > 0) {
+        config.agentMcpOverrides = agentMcpOverrides;
+      }
 
       return { success: true, data: config };
     }
