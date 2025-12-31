@@ -331,7 +331,7 @@
     "noProjectSelectedDescription": "Sélectionnez un projet dans le menu déroulant pour voir et configurer les serveurs MCP.",
     "projectNotInitialized": "Projet non initialisé",
     "projectNotInitializedDescription": "Initialisez Auto Claude pour ce projet pour configurer les serveurs MCP.",
-    "browserAutomation": "Automatisation navigateur (agents QA uniquement)",
+    "browserAutomation": "Automatisation du navigateur (agents QA uniquement)",
     "alwaysEnabled": "toujours activé",
     "addServer": "Ajouter un serveur",
     "addMcpTo": "Ajouter un serveur MCP à {{agent}}",
@@ -364,7 +364,7 @@
       },
       "puppeteer": {
         "name": "Puppeteer",
-        "description": "Automatisation de navigateur web pour les tests"
+        "description": "Automatisation du navigateur web pour les tests"
       },
       "autoClaude": {
         "name": "Outils Auto-Claude",

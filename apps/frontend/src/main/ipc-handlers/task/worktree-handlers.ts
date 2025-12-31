@@ -35,7 +35,7 @@ function getUtilitySettings(): { model: string; modelId: string; thinkingLevel: 
         model,
         modelId: MODEL_ID_MAP[model] || MODEL_ID_MAP.haiku,
         thinkingLevel,
-        thinkingBudget: THINKING_BUDGET_MAP[thinkingLevel] ?? THINKING_BUDGET_MAP.low
+        thinkingBudget: thinkingLevel in THINKING_BUDGET_MAP ? THINKING_BUDGET_MAP[thinkingLevel] : THINKING_BUDGET_MAP.low
       };
     }
   } catch (error) {

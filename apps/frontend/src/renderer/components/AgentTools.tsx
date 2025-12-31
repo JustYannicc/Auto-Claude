@@ -437,6 +437,7 @@ function AgentCard({ id, config, modelLabel, thinkingLabel, overrides, mcpServer
     <div className="border border-border rounded-lg bg-card overflow-hidden">
       {/* Header - clickable to expand */}
       <button
+        type="button"
         onClick={() => setIsExpanded(!isExpanded)}
         className="w-full flex items-center gap-3 p-4 hover:bg-muted/50 transition-colors text-left"
       >
@@ -478,6 +479,7 @@ function AgentCard({ id, config, modelLabel, thinkingLabel, overrides, mcpServer
               </h4>
               {availableMcps.length > 0 && (
                 <button
+                  type="button"
                   onClick={(e) => { e.stopPropagation(); setShowAddDialog(true); }}
                   className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors"
                 >
@@ -509,6 +511,7 @@ function AgentCard({ id, config, modelLabel, thinkingLabel, overrides, mcpServer
                       </div>
                       {canRemove && (
                         <button
+                          type="button"
                           onClick={(e) => { e.stopPropagation(); onRemoveMcp(id, server); }}
                           className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-destructive transition-all"
                           title={t('mcp.remove')}
@@ -536,6 +539,7 @@ function AgentCard({ id, config, modelLabel, thinkingLabel, overrides, mcpServer
                         </span>
                       </div>
                       <button
+                        type="button"
                         onClick={(e) => { e.stopPropagation(); onAddMcp(id, server); }}
                         className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-primary transition-all"
                         title={t('mcp.restore')}
@@ -588,6 +592,7 @@ function AgentCard({ id, config, modelLabel, thinkingLabel, overrides, mcpServer
                 const ServerIcon = server?.icon || Server;
                 return (
                   <button
+                    type="button"
                     key={mcpId}
                     onClick={() => { onAddMcp(id, mcpId); setShowAddDialog(false); }}
                     className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-muted transition-colors text-left"
@@ -616,6 +621,7 @@ function AgentCard({ id, config, modelLabel, thinkingLabel, overrides, mcpServer
                   const ServerIcon = server?.icon || Server;
                   return (
                     <button
+                      type="button"
                       key={mcpId}
                       onClick={() => { onAddMcp(id, mcpId); setShowAddDialog(false); }}
                       className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-muted transition-colors text-left opacity-60"
@@ -647,7 +653,7 @@ export function AgentTools() {
     new Set(['spec', 'build', 'qa'])
   );
   const [envConfig, setEnvConfig] = useState<ProjectEnvConfig | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [_isLoading, setIsLoading] = useState(false);
 
   // Custom MCP server dialog state
   const [showCustomMcpDialog, setShowCustomMcpDialog] = useState(false);
@@ -970,30 +976,8 @@ export function AgentTools() {
   const featureModels = settings.featureModels || DEFAULT_FEATURE_MODELS;
   const featureThinking = settings.featureThinking || DEFAULT_FEATURE_THINKING;
 
-  // Get MCP server status for display
+  // Get MCP server states for display
   const mcpServers = envConfig?.mcpServers || {};
-  const getServerStatus = (serverId: string): 'enabled' | 'disabled' | 'not_configured' => {
-    switch (serverId) {
-      case 'context7':
-        return mcpServers.context7Enabled !== false ? 'enabled' : 'disabled';
-      case 'graphiti-memory':
-        return mcpServers.graphitiEnabled && envConfig?.graphitiProviderConfig
-          ? 'enabled'
-          : 'not_configured';
-      case 'linear':
-        return mcpServers.linearMcpEnabled !== false && envConfig?.linearEnabled
-          ? 'enabled'
-          : envConfig?.linearEnabled ? 'disabled' : 'not_configured';
-      case 'electron':
-        return mcpServers.electronEnabled ? 'enabled' : 'disabled';
-      case 'puppeteer':
-        return mcpServers.puppeteerEnabled ? 'enabled' : 'disabled';
-      case 'auto-claude':
-        return 'enabled'; // Always enabled
-      default:
-        return 'enabled';
-    }
-  };
 
   // Count enabled MCP servers
   const enabledCount = [
@@ -1240,6 +1224,7 @@ export function AgentTools() {
                       </span>
                     </div>
                     <button
+                      type="button"
                       onClick={() => { setEditingCustomServer(null); setShowCustomMcpDialog(true); }}
                       className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors"
                     >
@@ -1321,6 +1306,7 @@ export function AgentTools() {
                               {/* Edit/Delete - show on hover */}
                               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button
+                                  type="button"
                                   onClick={() => { setEditingCustomServer(server); setShowCustomMcpDialog(true); }}
                                   className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
                                   title="Edit"
@@ -1328,6 +1314,7 @@ export function AgentTools() {
                                   <Pencil className="h-3.5 w-3.5" />
                                 </button>
                                 <button
+                                  type="button"
                                   onClick={() => handleDeleteCustomServer(server.id)}
                                   className="p-1.5 text-muted-foreground hover:text-destructive transition-colors"
                                   title="Delete"
@@ -1362,6 +1349,7 @@ export function AgentTools() {
               <div key={categoryId} className="space-y-3">
                 {/* Category Header */}
                 <button
+                  type="button"
                   onClick={() => toggleCategory(categoryId)}
                   className="flex items-center gap-2 w-full text-left hover:opacity-80 transition-opacity"
                 >
