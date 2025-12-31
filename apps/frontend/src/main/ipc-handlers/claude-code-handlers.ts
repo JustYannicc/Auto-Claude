@@ -88,7 +88,7 @@ function getInstallCommand(isUpdate: boolean): string {
 /**
  * Escape single quotes in a string for use in AppleScript
  */
-function escapeAppleScriptString(str: string): string {
+export function escapeAppleScriptString(str: string): string {
   return str.replace(/'/g, "'\\''");
 }
 
@@ -97,7 +97,7 @@ function escapeAppleScriptString(str: string): string {
  * Uses the user's preferred terminal from settings
  * Supports macOS, Windows, and Linux terminals
  */
-async function openTerminalWithCommand(command: string): Promise<void> {
+export async function openTerminalWithCommand(command: string): Promise<void> {
   const platform = process.platform;
   const settings = readSettingsFile();
   const preferredTerminal = settings?.preferredTerminal as string | undefined;
