@@ -196,8 +196,22 @@ export function PRDetail({
     }
   }, [logsExpanded, onGetLogs, isLoadingLogs]);
 
+  // Track previous reviewing state to detect completion
+  const wasReviewingRef = useRef(false);
+
   // Refresh logs periodically while reviewing (even faster during active review)
   useEffect(() => {
+    const wasReviewing = wasReviewingRef.current;
+    wasReviewingRef.current = isReviewing;
+
+    // Do one final refresh when review just completed to get final phase status
+    if (wasReviewing && !isReviewing) {
+      onGetLogs()
+        .then(logs => setPrLogs(logs))
+        .catch(() => {});
+      return;
+    }
+
     if (!isReviewing) return;
 
     const refreshLogs = async () => {
