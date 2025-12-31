@@ -570,10 +570,17 @@ async function runPRReview(
   const repo = config?.repo || project.name || 'unknown';
   const logCollector = new PRLogCollector(project, prNumber, repo, false);
 
+  // Build environment with project settings
+  const subprocessEnv: Record<string, string> = {};
+  if (project.settings?.useClaudeMd !== false) {
+    subprocessEnv['USE_CLAUDE_MD'] = 'true';
+  }
+
   const { process: childProcess, promise } = runPythonSubprocess<PRReviewResult>({
     pythonPath: getPythonPath(backendPath),
     args,
     cwd: backendPath,
+    env: subprocessEnv,
     onProgress: (percent, message) => {
       debugLog('Progress update', { percent, message });
       sendProgress({
@@ -1380,10 +1387,17 @@ export function registerPRHandlers(
           const repo = config?.repo || project.name || 'unknown';
           const logCollector = new PRLogCollector(project, prNumber, repo, true);
 
+          // Build environment with project settings
+          const followupEnv: Record<string, string> = {};
+          if (project.settings?.useClaudeMd !== false) {
+            followupEnv['USE_CLAUDE_MD'] = 'true';
+          }
+
           const { process: childProcess, promise } = runPythonSubprocess<PRReviewResult>({
             pythonPath: getPythonPath(backendPath),
             args,
             cwd: backendPath,
+            env: followupEnv,
             onProgress: (percent, message) => {
               debugLog('Progress update', { percent, message });
               sendProgress({
