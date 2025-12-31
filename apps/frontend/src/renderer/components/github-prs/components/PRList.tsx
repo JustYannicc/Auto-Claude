@@ -262,9 +262,14 @@ export function PRList({ prs, selectedPRNumber, isLoading, error, getReviewState
                         // Follow-up review with no new findings to post is effectively "posted"
                         (Boolean(reviewState?.result?.isFollowupReview) && reviewState?.result?.findings?.length === 0)
                       }
-                      hasBlockingFindings={Boolean(reviewState?.result?.findings?.some(
-                        f => f.severity === 'critical' || f.severity === 'high'
-                      ))}
+                      hasBlockingFindings={
+                        // Use overallStatus from review result as source of truth
+                        reviewState?.result?.overallStatus === 'request_changes' ||
+                        // Fallback to checking findings severity
+                        Boolean(reviewState?.result?.findings?.some(
+                          f => f.severity === 'critical' || f.severity === 'high'
+                        ))
+                      }
                       hasNewCommits={Boolean(reviewState?.newCommitsCheck?.hasNewCommits)}
                       hasCommitsAfterPosting={reviewState?.newCommitsCheck?.hasCommitsAfterPosting ?? false}
                       t={t}
