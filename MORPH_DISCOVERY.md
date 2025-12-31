@@ -1,9 +1,9 @@
 # Morph Service Discovery
 
-## Status: API Specification Documented
+## Status: API Test Script Created - Awaiting Credentials
 **Date:** December 31, 2025
 **Purpose:** Document Morph service identity, documentation, and API access for integration into Auto-Claude
-**Subtask:** subtask-1-2 - Obtain and document Morph API specification
+**Current Subtask:** subtask-1-3 - Test Morph API with sample credentials
 
 ---
 
@@ -608,26 +608,170 @@ class ApplyToolManager:
 
 ---
 
-## 7. Next Steps
+## 7. API Testing (subtask-1-3)
 
-Once stakeholder questions are answered:
+### 7.1 Test Script
 
-1. [ ] Verify API documentation URLs and update this document
-2. [ ] Test API access with provided credentials (subtask-1-3)
-3. [ ] Confirm actual request/response formats match this specification
-4. [ ] Identify Python SDK or confirm HTTP client approach
-5. [ ] Proceed to Phase 2: Backend API Integration
+A comprehensive API test script has been created to verify Morph API connectivity and functionality:
+
+**Location:** `scripts/test_morph_api.py`
+
+**Features:**
+- Tests health check endpoint (no auth required)
+- Tests API key validation endpoint
+- Tests apply endpoint with sample code transformation
+- Outputs results in both human-readable and JSON formats
+- Records detailed results for documentation
+
+### 7.2 How to Run Tests
+
+```bash
+# Install required dependency
+pip install httpx
+
+# Option 1: Set API key via environment variable (recommended)
+export MORPH_API_KEY="your-api-key-here"
+python scripts/test_morph_api.py
+
+# Option 2: Pass API key directly
+python scripts/test_morph_api.py --api-key "your-api-key-here"
+
+# Run specific tests
+python scripts/test_morph_api.py --test health    # Health check only
+python scripts/test_morph_api.py --test validate  # API key validation only
+python scripts/test_morph_api.py --test apply     # Apply operation only
+
+# Output JSON results for documentation
+python scripts/test_morph_api.py --json
+```
+
+### 7.3 Test Status
+
+| Test | Status | Notes |
+|------|--------|-------|
+| Health Check (`GET /health`) | **BLOCKED** | Requires network access to Morph API |
+| API Key Validation (`GET /auth/validate`) | **BLOCKED** | Requires valid API credentials |
+| Apply Operation (`POST /apply`) | **BLOCKED** | Requires valid API credentials |
+
+### 7.4 Current Blocker
+
+**⚠️ API TESTING BLOCKED - NO CREDENTIALS AVAILABLE**
+
+To complete API testing, the following is required:
+
+1. **Valid Morph API Key:**
+   - Obtain test/sandbox API credentials from Morph Labs
+   - Key should be in expected format: `mk_live_xxxxx` or `mk_test_xxxxx`
+
+2. **Network Access:**
+   - Confirm base URL: `https://api.morphlabs.io/v1`
+   - Verify firewall/proxy allows outbound HTTPS connections
+
+3. **Stakeholder Input:**
+   - Confirm Morph service provider (Morph Labs)
+   - Provide test account credentials
+   - Clarify sandbox vs production environment for testing
+
+### 7.5 Expected Test Output
+
+When API credentials are available, the test script will produce output similar to:
+
+```
+============================================================
+Morph API Test Suite
+Base URL: https://api.morphlabs.io/v1
+API Key: mk_test_xx...********************
+Timestamp: 2025-12-31T21:00:00Z
+============================================================
+
+=== Testing Health Endpoint ===
+  Endpoint: https://api.morphlabs.io/v1/health
+  Status Code: 200
+  Response: {
+    "status": "healthy",
+    "version": "1.0.0"
+  }
+  Result: ✓ PASSED
+
+=== Testing Validate Endpoint ===
+  Endpoint: https://api.morphlabs.io/v1/auth/validate
+  Status Code: 200
+  Response: {
+    "valid": true,
+    "account": {
+      "id": "acc_xxxxx",
+      "plan": "pro"
+    }
+  }
+  Result: ✓ PASSED
+
+=== Testing Apply Endpoint ===
+  Endpoint: https://api.morphlabs.io/v1/apply
+  Request: {
+    "file_path": "test_sample.py",
+    "original_content": "def add(a, b):\n    return a + b",
+    "instruction": "Add type hints to the function",
+    "language": "python"
+  }
+  Status Code: 200
+  Response: {
+    "success": true,
+    "result": {
+      "new_content": "def add(a: int, b: int) -> int:\n    return a + b",
+      "confidence": 0.98
+    }
+  }
+  Result: ✓ PASSED
+
+============================================================
+TEST SUMMARY
+============================================================
+  Health Check:  ✓ PASSED
+  API Validate:  ✓ PASSED
+  Apply Test:    ✓ PASSED
+============================================================
+
+OVERALL: ✓ ALL TESTS PASSED
+```
+
+### 7.6 Test Results (To Be Updated)
+
+**Test Run Date:** Not yet executed - awaiting credentials
+
+**Results:**
+```json
+{
+  "status": "not_executed",
+  "reason": "No API credentials available",
+  "blocker": "Requires MORPH_API_KEY environment variable or --api-key argument",
+  "test_script": "scripts/test_morph_api.py",
+  "next_action": "Obtain test credentials from stakeholder and re-run tests"
+}
+```
 
 ---
 
-## 8. References
+## 8. Next Steps
+
+Once API credentials are obtained:
+
+1. [x] Create API test script (`scripts/test_morph_api.py`)
+2. [ ] Obtain test API credentials from stakeholder
+3. [ ] Run test script: `python scripts/test_morph_api.py --json`
+4. [ ] Update section 7.6 with actual test results
+5. [ ] Verify actual API endpoints match documented specification
+6. [ ] Proceed to subtask-1-4: Document functional differences
+
+---
+
+## 9. References
 
 - **Spec:** `.auto-claude/specs/002-implement-morph-fast-apply-as-configurable-apply-t/spec.md`
 - **Implementation Plan:** `.auto-claude/specs/002-implement-morph-fast-apply-as-configurable-apply-t/implementation_plan.json`
 
 ---
 
-## 9. Verification Checklist
+## 10. Verification Checklist
 
 This API specification document includes:
 
