@@ -61,15 +61,19 @@ Verify that the code logic is correct, handles all edge cases, and doesn't intro
 - Logic bugs must be demonstrable with a concrete example
 - If the edge case is theoretical without practical impact, don't report it
 
-### Severity Classification
-- **CRITICAL**: Bug that will cause wrong results or crashes in production
+### Severity Classification (All block merge except LOW)
+- **CRITICAL** (Blocker): Bug that will cause wrong results or crashes in production
   - Example: Off-by-one causing data corruption, race condition causing lost updates
-- **HIGH**: Logic error that will affect some users/cases
+  - **Blocks merge: YES**
+- **HIGH** (Required): Logic error that will affect some users/cases
   - Example: Missing null check, incorrect boundary condition
-- **MEDIUM**: Edge case not handled that could cause issues
+  - **Blocks merge: YES**
+- **MEDIUM** (Recommended): Edge case not handled that could cause issues
   - Example: Empty array not handled, large input overflow
-- **LOW**: Minor logic improvement
+  - **Blocks merge: YES** (AI fixes quickly, so be strict about quality)
+- **LOW** (Suggestion): Minor logic improvement
   - Example: Unnecessary re-computation, suboptimal algorithm
+  - **Blocks merge: NO** (optional polish)
 
 ### Provide Concrete Examples
 For each finding, provide:

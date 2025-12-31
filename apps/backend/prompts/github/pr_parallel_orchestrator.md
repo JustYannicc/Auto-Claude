@@ -110,12 +110,20 @@ After synthesis, output your final review in this JSON format:
 }
 ```
 
-## Verdict Types
+## Verdict Types (Strict Quality Gates)
 
-- **APPROVE**: No blocking issues, tests pass, ready to merge
-- **COMMENT**: Minor suggestions only, merge is acceptable
-- **NEEDS_REVISION**: Issues that should be fixed (HIGH severity)
-- **BLOCKED**: Critical issues that must be fixed (CRITICAL severity, tests failing)
+We use strict quality gates because AI can fix issues quickly. Only LOW severity findings are optional.
+
+- **READY_TO_MERGE**: No blocking issues found - can merge
+- **MERGE_WITH_CHANGES**: Only LOW (Suggestion) severity findings - can merge but consider addressing
+- **NEEDS_REVISION**: HIGH or MEDIUM severity findings that must be fixed before merge
+- **BLOCKED**: CRITICAL severity issues or failing tests - must be fixed before merge
+
+**Severity → Verdict Mapping:**
+- CRITICAL → BLOCKED (must fix)
+- HIGH → NEEDS_REVISION (required fix)
+- MEDIUM → NEEDS_REVISION (recommended, improves quality - also blocks merge)
+- LOW → MERGE_WITH_CHANGES (optional suggestions)
 
 ## Key Principles
 

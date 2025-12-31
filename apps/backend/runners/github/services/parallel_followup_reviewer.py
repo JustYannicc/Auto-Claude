@@ -588,10 +588,15 @@ The SDK will run invoked agents in parallel automatically.
             else:
                 overall_status = "approve"
 
-            # Generate blockers from critical/high severity findings
+            # Generate blockers from critical/high/medium severity findings
+            # (Medium also blocks merge in our strict quality gates approach)
             blockers = []
             for finding in unique_findings:
-                if finding.severity in (ReviewSeverity.CRITICAL, ReviewSeverity.HIGH):
+                if finding.severity in (
+                    ReviewSeverity.CRITICAL,
+                    ReviewSeverity.HIGH,
+                    ReviewSeverity.MEDIUM,
+                ):
                     blockers.append(f"{finding.category.value}: {finding.title}")
 
             result = PRReviewResult(

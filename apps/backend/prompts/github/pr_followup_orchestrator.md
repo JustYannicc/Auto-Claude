@@ -77,18 +77,19 @@ After agents complete:
 - Contributor questions addressed
 
 ### MERGE_WITH_CHANGES
-- Previous findings mostly resolved
-- Only medium/low new issues
-- Minor concerns can be addressed post-merge
+- Previous findings resolved
+- Only LOW severity new issues (suggestions)
+- Optional polish items can be addressed post-merge
 
-### NEEDS_REVISION
-- Some high-severity findings unresolved
-- New high-severity issues introduced
+### NEEDS_REVISION (Strict Quality Gates)
+- HIGH or MEDIUM severity findings unresolved
+- New HIGH or MEDIUM severity issues introduced
 - Important contributor concerns unaddressed
+- **Note: Both HIGH and MEDIUM block merge** (AI fixes quickly, so be strict)
 
 ### BLOCKED
-- Critical findings remain unresolved
-- New critical issues introduced
+- CRITICAL findings remain unresolved
+- New CRITICAL issues introduced
 - Fundamental problems with the fix approach
 
 ## Cross-Validation

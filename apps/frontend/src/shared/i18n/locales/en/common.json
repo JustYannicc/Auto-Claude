@@ -161,14 +161,14 @@
     "findingsPosted": "{{count}} Posted",
     "followupInProgress": "Follow-up Analysis in Progress...",
     "severity": {
-      "critical": "Critical",
-      "high": "High",
-      "medium": "Medium",
-      "low": "Low",
-      "criticalDesc": "Must fix before merge",
-      "highDesc": "Should fix before merge",
-      "mediumDesc": "Consider fixing",
-      "lowDesc": "Nice to have"
+      "critical": "Blocker",
+      "high": "Required",
+      "medium": "Recommended",
+      "low": "Suggestion",
+      "criticalDesc": "Must fix",
+      "highDesc": "Should fix",
+      "mediumDesc": "Improve quality",
+      "lowDesc": "Consider"
     },
     "category": {
       "security": "Security",
@@ -185,7 +185,7 @@
       "closed": "Closed",
       "merged": "Merged"
     },
-    "selectCriticalHigh": "Select Critical/High ({{count}})",
+    "selectCriticalHigh": "Select Blocker/Required ({{count}})",
     "selectAll": "Select All",
     "clear": "Clear",
     "noIssuesFound": "No issues found! The code looks good.",

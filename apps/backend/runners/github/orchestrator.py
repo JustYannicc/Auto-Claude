@@ -701,6 +701,8 @@ class GitHubOrchestrator:
         # Count by severity
         critical = [f for f in findings if f.severity == ReviewSeverity.CRITICAL]
         high = [f for f in findings if f.severity == ReviewSeverity.HIGH]
+        medium = [f for f in findings if f.severity == ReviewSeverity.MEDIUM]
+        low = [f for f in findings if f.severity == ReviewSeverity.LOW]
 
         # NEW: Verification failures are ALWAYS blockers (even if not critical severity)
         verification_failures = [
@@ -789,9 +791,15 @@ class GitHubOrchestrator:
             else:
                 verdict = MergeVerdict.NEEDS_REVISION
                 reasoning = f"{len(blockers)} issues must be addressed"
-        elif high:
+        elif high or medium:
+            # High and Medium severity findings block merge
+            verdict = MergeVerdict.NEEDS_REVISION
+            total = len(high) + len(medium)
+            reasoning = f"{total} issue(s) must be addressed ({len(high)} required, {len(medium)} recommended)"
+        elif low:
+            # Only Low severity suggestions - can merge but consider addressing
             verdict = MergeVerdict.MERGE_WITH_CHANGES
-            reasoning = f"{len(high)} high-priority issues to address"
+            reasoning = f"{len(low)} suggestion(s) to consider"
         else:
             verdict = MergeVerdict.READY_TO_MERGE
             reasoning = "No blocking issues found"

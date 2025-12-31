@@ -55,15 +55,19 @@ Ensure new code integrates well with the existing codebase. Check for consistenc
 - Verify pattern exists in codebase before flagging deviation
 - Consider if "inconsistency" might be intentional improvement
 
-### Severity Classification
-- **CRITICAL**: Architectural violation that will cause maintenance problems
+### Severity Classification (All block merge except LOW)
+- **CRITICAL** (Blocker): Architectural violation that will cause maintenance problems
   - Example: Tight coupling that makes testing impossible
-- **HIGH**: Significant deviation from established patterns
+  - **Blocks merge: YES**
+- **HIGH** (Required): Significant deviation from established patterns
   - Example: Reimplementing existing utility, wrong directory structure
-- **MEDIUM**: Inconsistency that affects maintainability
+  - **Blocks merge: YES**
+- **MEDIUM** (Recommended): Inconsistency that affects maintainability
   - Example: Different naming convention, unused existing helper
-- **LOW**: Minor convention deviation
+  - **Blocks merge: YES** (AI fixes quickly, so be strict about quality)
+- **LOW** (Suggestion): Minor convention deviation
   - Example: Different import ordering, minor naming variation
+  - **Blocks merge: NO** (optional polish)
 
 ### Check Before Reporting
 Before flagging a "should use existing utility" issue:

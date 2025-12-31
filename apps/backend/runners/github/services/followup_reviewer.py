@@ -470,11 +470,20 @@ class FollowupReviewer:
         high_unresolved = sum(
             1 for f in unresolved_findings if f.severity == ReviewSeverity.HIGH
         )
+        medium_unresolved = sum(
+            1 for f in unresolved_findings if f.severity == ReviewSeverity.MEDIUM
+        )
+        low_unresolved = sum(
+            1 for f in unresolved_findings if f.severity == ReviewSeverity.LOW
+        )
         critical_new = sum(
             1 for f in new_findings if f.severity == ReviewSeverity.CRITICAL
         )
         high_new = sum(1 for f in new_findings if f.severity == ReviewSeverity.HIGH)
+        medium_new = sum(1 for f in new_findings if f.severity == ReviewSeverity.MEDIUM)
+        low_new = sum(1 for f in new_findings if f.severity == ReviewSeverity.LOW)
 
+        # Critical and High are always blockers
         for f in unresolved_findings:
             if f.severity in [ReviewSeverity.CRITICAL, ReviewSeverity.HIGH]:
                 blockers.append(f"Unresolved: {f.title} ({f.file}:{f.line})")
@@ -490,17 +499,25 @@ class FollowupReviewer:
                 f"Still blocked by {critical_unresolved + critical_new} critical issues "
                 f"({critical_unresolved} unresolved, {critical_new} new)"
             )
-        elif high_unresolved > 0 or high_new > 0:
+        elif (
+            high_unresolved > 0
+            or high_new > 0
+            or medium_unresolved > 0
+            or medium_new > 0
+        ):
+            # High and Medium severity findings block merge
             verdict = MergeVerdict.NEEDS_REVISION
+            total_blocking = high_unresolved + high_new + medium_unresolved + medium_new
             reasoning = (
-                f"{high_unresolved + high_new} high-priority issues "
-                f"({high_unresolved} unresolved, {high_new} new)"
+                f"{total_blocking} issue(s) must be addressed "
+                f"({high_unresolved + medium_unresolved} unresolved, {high_new + medium_new} new)"
             )
-        elif len(unresolved_findings) > 0 or len(new_findings) > 0:
+        elif low_unresolved > 0 or low_new > 0:
+            # Only Low severity suggestions remaining - can merge but consider addressing
             verdict = MergeVerdict.MERGE_WITH_CHANGES
             reasoning = (
                 f"{resolved_count} issues resolved. "
-                f"{len(unresolved_findings)} remaining, {len(new_findings)} new minor issues."
+                f"{low_unresolved + low_new} suggestion(s) to consider."
             )
         else:
             verdict = MergeVerdict.READY_TO_MERGE

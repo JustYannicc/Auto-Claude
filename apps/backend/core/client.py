@@ -49,12 +49,13 @@ def load_project_mcp_config(project_dir: Path) -> dict:
     - PUPPETEER_MCP_ENABLED (default: false)
     - AGENT_MCP_<agent>_ADD (per-agent MCP additions)
     - AGENT_MCP_<agent>_REMOVE (per-agent MCP removals)
+    - CUSTOM_MCP_SERVERS (JSON array of custom server configs)
 
     Args:
         project_dir: Path to the project directory
 
     Returns:
-        Dict of MCP configuration values (string values)
+        Dict of MCP configuration values (string values, except CUSTOM_MCP_SERVERS which is parsed JSON)
     """
     env_path = project_dir / ".auto-claude" / ".env"
     if not env_path.exists():
@@ -84,6 +85,15 @@ def load_project_mcp_config(project_dir: Path) -> dict:
                     # Include per-agent MCP overrides (AGENT_MCP_<agent>_ADD/REMOVE)
                     elif key.startswith("AGENT_MCP_"):
                         config[key] = value
+                    # Include custom MCP servers (parse JSON)
+                    elif key == "CUSTOM_MCP_SERVERS":
+                        try:
+                            config["CUSTOM_MCP_SERVERS"] = json.loads(value)
+                        except json.JSONDecodeError:
+                            logger.warning(
+                                f"Failed to parse CUSTOM_MCP_SERVERS JSON: {value}"
+                            )
+                            config["CUSTOM_MCP_SERVERS"] = []
     except Exception as e:
         logger.debug(f"Failed to load project MCP config from {env_path}: {e}")
 
@@ -389,6 +399,30 @@ def create_client(
         auto_claude_mcp_server = create_auto_claude_mcp_server(spec_dir, project_dir)
         if auto_claude_mcp_server:
             mcp_servers["auto-claude"] = auto_claude_mcp_server
+
+    # Add custom MCP servers from project config
+    custom_servers = mcp_config.get("CUSTOM_MCP_SERVERS", [])
+    for custom in custom_servers:
+        server_id = custom.get("id")
+        if not server_id:
+            continue
+        # Only include if agent has it in their effective server list
+        if server_id not in required_servers:
+            continue
+        server_type = custom.get("type", "command")
+        if server_type == "command":
+            mcp_servers[server_id] = {
+                "command": custom.get("command", "npx"),
+                "args": custom.get("args", []),
+            }
+        elif server_type == "http":
+            server_config = {
+                "type": "http",
+                "url": custom.get("url", ""),
+            }
+            if custom.get("headers"):
+                server_config["headers"] = custom["headers"]
+            mcp_servers[server_id] = server_config
 
     # Build system prompt
     base_prompt = (

@@ -161,14 +161,14 @@
     "findingsPosted": "{{count}} publiés",
     "followupInProgress": "Analyse de suivi en cours...",
     "severity": {
-      "critical": "Critique",
-      "high": "Élevée",
-      "medium": "Moyenne",
-      "low": "Faible",
-      "criticalDesc": "Doit être corrigé avant fusion",
-      "highDesc": "Devrait être corrigé avant fusion",
-      "mediumDesc": "À considérer",
-      "lowDesc": "Optionnel"
+      "critical": "Bloquant",
+      "high": "Requis",
+      "medium": "Recommandé",
+      "low": "Suggestion",
+      "criticalDesc": "À corriger",
+      "highDesc": "À traiter",
+      "mediumDesc": "Améliore la qualité",
+      "lowDesc": "À considérer"
     },
     "category": {
       "security": "Sécurité",
@@ -185,7 +185,7 @@
       "closed": "Fermé",
       "merged": "Fusionné"
     },
-    "selectCriticalHigh": "Sélectionner Critique/Élevée ({{count}})",
+    "selectCriticalHigh": "Sélectionner Bloquant/Requis ({{count}})",
     "selectAll": "Tout sélectionner",
     "clear": "Effacer",
     "noIssuesFound": "Aucun problème trouvé ! Le code est bon.",

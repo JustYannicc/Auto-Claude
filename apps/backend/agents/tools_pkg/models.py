@@ -350,12 +350,16 @@ def get_agent_config(agent_type: str) -> dict:
     return AGENT_CONFIGS[agent_type]
 
 
-def _map_mcp_server_name(name: str) -> str | None:
+def _map_mcp_server_name(
+    name: str, custom_server_ids: list[str] | None = None
+) -> str | None:
     """
     Map user-friendly MCP server names to internal identifiers.
+    Also accepts custom server IDs directly.
 
     Args:
         name: User-provided MCP server name
+        custom_server_ids: List of custom server IDs to accept as-is
 
     Returns:
         Internal server identifier or None if not recognized
@@ -371,7 +375,14 @@ def _map_mcp_server_name(name: str) -> str | None:
         "puppeteer": "puppeteer",
         "auto-claude": "auto-claude",
     }
-    return mappings.get(name.lower().strip())
+    # Check if it's a known mapping
+    mapped = mappings.get(name.lower().strip())
+    if mapped:
+        return mapped
+    # Check if it's a custom server ID (accept as-is)
+    if custom_server_ids and name in custom_server_ids:
+        return name
+    return None
 
 
 def get_required_mcp_servers(
@@ -454,13 +465,17 @@ def get_required_mcp_servers(
     add_key = f"AGENT_MCP_{agent_type}_ADD"
     remove_key = f"AGENT_MCP_{agent_type}_REMOVE"
 
+    # Extract custom server IDs for mapping (allows custom servers to be recognized)
+    custom_servers = mcp_config.get("CUSTOM_MCP_SERVERS", [])
+    custom_server_ids = [s.get("id") for s in custom_servers if s.get("id")]
+
     # Process additions
     if add_key in mcp_config:
         additions = [
             s.strip() for s in str(mcp_config[add_key]).split(",") if s.strip()
         ]
         for server in additions:
-            mapped = _map_mcp_server_name(server)
+            mapped = _map_mcp_server_name(server, custom_server_ids)
             if mapped and mapped not in servers:
                 servers.append(mapped)
 
@@ -470,7 +485,7 @@ def get_required_mcp_servers(
             s.strip() for s in str(mcp_config[remove_key]).split(",") if s.strip()
         ]
         for server in removals:
-            mapped = _map_mcp_server_name(server)
+            mapped = _map_mcp_server_name(server, custom_server_ids)
             if mapped and mapped != "auto-claude":  # auto-claude cannot be removed
                 servers = [s for s in servers if s != mapped]
 
