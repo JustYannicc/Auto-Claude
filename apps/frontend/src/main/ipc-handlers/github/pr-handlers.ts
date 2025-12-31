@@ -229,6 +229,7 @@ function parseLogLine(line: string): { source: string; content: string; isError:
     /^\[ParallelFollowup\]\s*(.*)$/,
     /^\[ParallelOrchestrator\]\s*(.*)$/,
     /^\[BotDetector\]\s*(.*)$/,
+    /^\[PR Review Engine\]\s*(.*)$/,
     /^\[DEBUG\s+(\w+)\]\s*(.*)$/,
     /^\[ERROR\s+(\w+)\]\s*(.*)$/,
   ];
@@ -248,13 +249,23 @@ function parseLogLine(line: string): { source: string; content: string; isError:
           isError: pattern.source.includes('ERROR'),
         };
       }
-      const source = line.match(/^\[(\w+)\]/)?.[1] || 'Unknown';
+      const source = line.match(/^\[(\w+(?:\s+\w+)*)\]/)?.[1] || 'Unknown';
       return {
         source,
         content: match[1] || line,
         isError: false,
       };
     }
+  }
+
+  // Check for PR progress messages [PR #XXX] [YY%] message
+  const prProgressMatch = line.match(/^\[PR #\d+\]\s*\[\s*(\d+)%\]\s*(.*)$/);
+  if (prProgressMatch) {
+    return {
+      source: 'Progress',
+      content: `[${prProgressMatch[1]}%] ${prProgressMatch[2]}`,
+      isError: false,
+    };
   }
 
   // Check for progress messages [XX%]
@@ -267,6 +278,23 @@ function parseLogLine(line: string): { source: string; content: string; isError:
     };
   }
 
+  // Match final summary lines (Status:, Summary:, Findings:, etc.)
+  const summaryPatterns = [
+    /^(Status|Summary|Findings|Verdict):\s*(.*)$/,
+    /^PR #\d+ Review Complete$/,
+    /^={10,}$/,
+  ];
+  for (const pattern of summaryPatterns) {
+    const match = line.match(pattern);
+    if (match) {
+      return {
+        source: 'Summary',
+        content: line,
+        isError: false,
+      };
+    }
+  }
+
   return null;
 }
 
@@ -276,10 +304,12 @@ function parseLogLine(line: string): { source: string; content: string; isError:
 function getPhaseFromSource(source: string): PRLogPhase {
   const contextSources = ['Context', 'BotDetector'];
   const analysisSources = ['AI', 'Orchestrator', 'ParallelOrchestrator', 'ParallelFollowup', 'Followup', 'orchestrator'];
+  const synthesisSources = ['PR Review Engine', 'Summary', 'Progress'];
 
   if (contextSources.includes(source)) return 'context';
   if (analysisSources.includes(source)) return 'analysis';
-  return 'synthesis';
+  if (synthesisSources.includes(source)) return 'synthesis';
+  return 'synthesis'; // Default to synthesis for unknown sources
 }
 
 /**
@@ -403,10 +433,19 @@ class PRLogCollector {
   }
 
   finalize(success: boolean): void {
-    // Mark all active phases as completed
+    // Mark all phases as completed based on success status
+    // For phases with entries: mark based on success
+    // For phases without entries (pending): mark as completed if previous phases completed
+    let previousCompleted = true;
     for (const phase of ['context', 'analysis', 'synthesis'] as PRLogPhase[]) {
-      if (this.logs.phases[phase].status === 'active') {
+      const phaseLog = this.logs.phases[phase];
+      if (phaseLog.status === 'active') {
         this.markPhaseComplete(phase, success);
+        previousCompleted = success;
+      } else if (phaseLog.status === 'pending' && previousCompleted && success) {
+        // If review succeeded, mark pending phases as completed (they just had no logs)
+        phaseLog.status = 'completed';
+        phaseLog.completed_at = new Date().toISOString();
       }
     }
     this.save();

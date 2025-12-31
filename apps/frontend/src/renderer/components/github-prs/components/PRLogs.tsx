@@ -57,6 +57,8 @@ const SOURCE_COLORS: Record<string, string> = {
   'ParallelFollowup': 'bg-cyan-500/20 text-cyan-400',
   'BotDetector': 'bg-amber-500/20 text-amber-400',
   'Progress': 'bg-green-500/20 text-green-400',
+  'PR Review Engine': 'bg-indigo-500/20 text-indigo-400',
+  'Summary': 'bg-emerald-500/20 text-emerald-400',
   'default': 'bg-muted text-muted-foreground'
 };
 
