@@ -196,7 +196,7 @@ export function PRDetail({
     }
   }, [logsExpanded, onGetLogs, isLoadingLogs]);
 
-  // Track previous reviewing state to detect completion
+  // Track previous reviewing state to detect transitions
   const wasReviewingRef = useRef(false);
 
   // Refresh logs periodically while reviewing (even faster during active review)
@@ -210,6 +210,11 @@ export function PRDetail({
         .then(logs => setPrLogs(logs))
         .catch(() => {});
       return;
+    }
+
+    // Clear old logs when a new review starts to avoid showing stale status
+    if (!wasReviewing && isReviewing) {
+      setPrLogs(null);
     }
 
     if (!isReviewing) return;
