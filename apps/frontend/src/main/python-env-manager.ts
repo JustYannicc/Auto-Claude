@@ -680,8 +680,21 @@ if sys.version_info >= (3, 12):
           this.emit('status', 'Dependencies installed successfully');
           resolve(true);
         } else {
-          console.error('[PythonEnvManager] Failed to install deps:', stderr || stdout);
-          this.emit('error', `Failed to install dependencies: ${stderr || stdout}`);
+          // Combine stderr and stdout for comprehensive error output
+          const combinedOutput = (stderr + '\n' + stdout).trim();
+          // Keep last 2000 chars to avoid overly long error messages but capture the actual error
+          const truncatedOutput = combinedOutput.length > 2000
+            ? '...' + combinedOutput.slice(-2000)
+            : combinedOutput;
+
+          console.error('[PythonEnvManager] Failed to install deps (exit code', code + '):', truncatedOutput);
+
+          // Provide detailed error message with exit code and pip output
+          const errorMessage = truncatedOutput
+            ? `pip install failed (exit code ${code}):\n${truncatedOutput}`
+            : `pip install failed with exit code ${code}`;
+
+          this.emit('error', errorMessage);
           resolve(false);
         }
       });
