@@ -950,6 +950,585 @@ class TestFallbackToDefaultWhenMorphDisabled:
         manager.close()
 
 
+class TestFallbackScenariosInvalidAPIKeyAndServiceUnavailable:
+    """
+    Test suite for subtask-4-4: Fallback scenarios for invalid API key and service unavailable.
+
+    These tests verify graceful degradation when:
+    1. Enable Morph with invalid API key -> verify fallback to default
+    2. Enable Morph with valid key but simulate service down -> verify fallback to default
+    3. Network timeout -> verify fallback to default
+    4. Verify no user operations blocked by Morph failures
+
+    CRITICAL: All failures must silently fall back without blocking user operations.
+    """
+
+    # =========================================================================
+    # Test 1: Invalid API Key Fallback
+    # =========================================================================
+
+    def test_fallback_on_invalid_api_key_during_selection(self, test_api_key):
+        """Test that tool selection falls back to default when API key is invalid."""
+        with patch.object(MorphClient, "_make_request") as mock_request:
+            # Simulate invalid API key response (401 Unauthorized)
+            mock_request.side_effect = MorphAPIError(
+                code="INVALID_API_KEY",
+                message="The provided API key is invalid",
+                status_code=401,
+            )
+
+            manager = ApplyToolManager.from_settings(
+                morph_enabled=True,
+                morph_api_key="invalid_api_key_12345",
+                validate_on_init=True,
+            )
+
+            # Select apply tools
+            selection = manager.select_apply_tools()
+
+            # Verify fallback to default tools
+            assert selection.method == ApplyMethod.DEFAULT
+            assert selection.tools == list(DEFAULT_APPLY_TOOLS)
+            assert selection.fallback_reason == FallbackReason.INVALID_API_KEY
+            assert selection.morph_available is False
+            assert "invalid" in selection.message.lower()
+
+            manager.close()
+
+    def test_fallback_on_invalid_api_key_returns_401_response(self, test_api_key):
+        """Test fallback when Morph API returns 401 for invalid key."""
+        with patch.object(MorphClient, "_make_request") as mock_request:
+            # Return 401 response instead of raising exception
+            def raise_401(*args, **kwargs):
+                raise MorphAPIError(
+                    code="INVALID_API_KEY",
+                    message="Unauthorized",
+                    status_code=401,
+                )
+
+            mock_request.side_effect = raise_401
+
+            manager = ApplyToolManager.from_settings(
+                morph_enabled=True,
+                morph_api_key="bad_key",
+            )
+
+            selection = manager.select_apply_tools()
+
+            assert selection.method == ApplyMethod.DEFAULT
+            assert selection.fallback_reason == FallbackReason.INVALID_API_KEY
+
+            manager.close()
+
+    def test_invalid_api_key_does_not_block_apply_with_fallback(self, test_api_key):
+        """Verify that invalid API key does not block user operations via apply_with_fallback."""
+        with patch.object(MorphClient, "_make_request") as mock_request:
+            # Simulate invalid API key
+            mock_request.side_effect = MorphAPIError(
+                code="INVALID_API_KEY",
+                message="Invalid API key",
+                status_code=401,
+            )
+
+            manager = ApplyToolManager.from_settings(
+                morph_enabled=True,
+                morph_api_key="invalid_key",
+                fallback_on_error=True,
+            )
+
+            # Apply with fallback should return None and DEFAULT, not raise exception
+            result, method = manager.apply_with_fallback(
+                file_path="test.py",
+                content="x = 1",
+                instruction="Add type hint",
+            )
+
+            # Should indicate fallback without blocking
+            assert method == ApplyMethod.DEFAULT
+            assert result is None  # Caller should use default tools
+
+            manager.close()
+
+    def test_empty_api_key_treated_as_invalid(self):
+        """Test that empty API key results in immediate fallback."""
+        manager = ApplyToolManager.from_settings(
+            morph_enabled=True,
+            morph_api_key="",  # Empty key
+        )
+
+        selection = manager.select_apply_tools()
+
+        assert selection.method == ApplyMethod.DEFAULT
+        assert selection.fallback_reason == FallbackReason.NO_API_KEY
+        assert selection.morph_available is False
+
+        manager.close()
+
+    def test_whitespace_only_api_key_treated_as_invalid(self):
+        """Test that whitespace-only API key results in fallback."""
+        manager = ApplyToolManager.from_settings(
+            morph_enabled=True,
+            morph_api_key="   ",  # Whitespace only
+        )
+
+        selection = manager.select_apply_tools()
+
+        assert selection.method == ApplyMethod.DEFAULT
+        assert selection.fallback_reason == FallbackReason.NO_API_KEY
+
+        manager.close()
+
+    # =========================================================================
+    # Test 2: Service Unavailable Fallback
+    # =========================================================================
+
+    def test_fallback_on_service_unavailable_health_check_fails(
+        self,
+        test_api_key,
+        mock_morph_validation_response,
+    ):
+        """Test fallback when health check indicates service is down."""
+        with patch.object(MorphClient, "_make_request") as mock_request:
+
+            def side_effect(*args, **kwargs):
+                if "/validate" in args[1]:
+                    return mock_morph_validation_response
+                elif args[1] == "/health":
+                    # Health check returns unhealthy status
+                    return {"status": "unhealthy"}
+                return {}
+
+            mock_request.side_effect = side_effect
+
+            manager = ApplyToolManager.from_settings(
+                morph_enabled=True,
+                morph_api_key=test_api_key,
+            )
+
+            selection = manager.select_apply_tools()
+
+            assert selection.method == ApplyMethod.DEFAULT
+            assert selection.fallback_reason == FallbackReason.SERVICE_UNAVAILABLE
+            assert selection.morph_available is False
+            assert "unavailable" in selection.message.lower()
+
+            manager.close()
+
+    def test_fallback_on_service_returns_503(
+        self,
+        test_api_key,
+        mock_morph_validation_response,
+    ):
+        """Test fallback when service returns 503 Service Unavailable."""
+        with patch.object(MorphClient, "_make_request") as mock_request:
+
+            def side_effect(*args, **kwargs):
+                if "/validate" in args[1]:
+                    return mock_morph_validation_response
+                elif args[1] == "/health":
+                    raise MorphAPIError(
+                        code="SERVICE_UNAVAILABLE",
+                        message="Service temporarily unavailable",
+                        status_code=503,
+                    )
+                return {}
+
+            mock_request.side_effect = side_effect
+
+            manager = ApplyToolManager.from_settings(
+                morph_enabled=True,
+                morph_api_key=test_api_key,
+            )
+
+            selection = manager.select_apply_tools()
+
+            assert selection.method == ApplyMethod.DEFAULT
+            # Service returning 503 during health check results in SERVICE_UNAVAILABLE
+            assert selection.fallback_reason in [
+                FallbackReason.SERVICE_UNAVAILABLE,
+                FallbackReason.API_ERROR,
+            ]
+
+            manager.close()
+
+    def test_service_unavailable_does_not_block_apply_with_fallback(
+        self,
+        test_api_key,
+        mock_morph_validation_response,
+    ):
+        """Verify service unavailable does not block user operations."""
+        with patch.object(MorphClient, "_make_request") as mock_request:
+
+            def side_effect(*args, **kwargs):
+                if "/validate" in args[1]:
+                    return mock_morph_validation_response
+                elif args[1] == "/health":
+                    return {"status": "unhealthy"}
+                elif args[1] == "/apply":
+                    # Should not even reach apply if health check fails
+                    raise AssertionError(
+                        "Should not call apply when service unavailable"
+                    )
+                return {}
+
+            mock_request.side_effect = side_effect
+
+            manager = ApplyToolManager.from_settings(
+                morph_enabled=True,
+                morph_api_key=test_api_key,
+                fallback_on_error=True,
+            )
+
+            # Apply with fallback should work without blocking
+            result, method = manager.apply_with_fallback(
+                file_path="test.py",
+                content="x = 1",
+                instruction="Add type hint",
+            )
+
+            assert method == ApplyMethod.DEFAULT
+            assert result is None
+
+            manager.close()
+
+    # =========================================================================
+    # Test 3: Network Timeout Fallback
+    # =========================================================================
+
+    def test_fallback_on_timeout_during_validation(self, test_api_key):
+        """Test fallback when validation request times out."""
+        with patch.object(MorphClient, "_make_request") as mock_request:
+            mock_request.side_effect = MorphTimeoutError("Request timed out after 60s")
+
+            manager = ApplyToolManager.from_settings(
+                morph_enabled=True,
+                morph_api_key=test_api_key,
+                validate_on_init=True,
+            )
+
+            selection = manager.select_apply_tools()
+
+            assert selection.method == ApplyMethod.DEFAULT
+            # Timeout during validation results in invalid API key fallback
+            assert selection.fallback_reason == FallbackReason.INVALID_API_KEY
+
+            manager.close()
+
+    def test_fallback_on_timeout_during_health_check(
+        self,
+        test_api_key,
+        mock_morph_validation_response,
+    ):
+        """Test fallback when health check times out."""
+        with patch.object(MorphClient, "_make_request") as mock_request:
+
+            def side_effect(*args, **kwargs):
+                if "/validate" in args[1]:
+                    return mock_morph_validation_response
+                elif args[1] == "/health":
+                    raise MorphTimeoutError("Health check timed out")
+                return {}
+
+            mock_request.side_effect = side_effect
+
+            manager = ApplyToolManager.from_settings(
+                morph_enabled=True,
+                morph_api_key=test_api_key,
+            )
+
+            selection = manager.select_apply_tools()
+
+            assert selection.method == ApplyMethod.DEFAULT
+            # Health check catches timeout and returns False -> SERVICE_UNAVAILABLE
+            # This is expected: timeouts during health check = service unavailable
+            assert selection.fallback_reason == FallbackReason.SERVICE_UNAVAILABLE
+            assert selection.morph_available is False
+
+            manager.close()
+
+    def test_fallback_on_connection_error_during_validation(self, test_api_key):
+        """Test fallback when connection fails during validation."""
+        with patch.object(MorphClient, "_make_request") as mock_request:
+            mock_request.side_effect = MorphConnectionError(
+                "Connection refused: Unable to reach Morph API"
+            )
+
+            manager = ApplyToolManager.from_settings(
+                morph_enabled=True,
+                morph_api_key=test_api_key,
+                validate_on_init=True,
+            )
+
+            selection = manager.select_apply_tools()
+
+            assert selection.method == ApplyMethod.DEFAULT
+            # Connection error during validation means we can't validate key
+            assert selection.fallback_reason == FallbackReason.INVALID_API_KEY
+
+            manager.close()
+
+    def test_fallback_on_connection_error_during_health_check(
+        self,
+        test_api_key,
+        mock_morph_validation_response,
+    ):
+        """Test fallback when connection fails during health check."""
+        with patch.object(MorphClient, "_make_request") as mock_request:
+
+            def side_effect(*args, **kwargs):
+                if "/validate" in args[1]:
+                    return mock_morph_validation_response
+                elif args[1] == "/health":
+                    raise MorphConnectionError("Network unreachable")
+                return {}
+
+            mock_request.side_effect = side_effect
+
+            manager = ApplyToolManager.from_settings(
+                morph_enabled=True,
+                morph_api_key=test_api_key,
+            )
+
+            selection = manager.select_apply_tools()
+
+            assert selection.method == ApplyMethod.DEFAULT
+            # Health check catches connection errors and returns False -> SERVICE_UNAVAILABLE
+            # This is expected: connection failures during health check = service unavailable
+            assert selection.fallback_reason == FallbackReason.SERVICE_UNAVAILABLE
+            assert "unavailable" in selection.message.lower()
+
+            manager.close()
+
+    def test_timeout_does_not_block_apply_with_fallback(
+        self,
+        test_api_key,
+        mock_morph_validation_response,
+        mock_morph_healthy_response,
+    ):
+        """Verify timeout does not block user operations."""
+        with patch.object(MorphClient, "_make_request") as mock_request:
+
+            def side_effect(*args, **kwargs):
+                if "/validate" in args[1]:
+                    return mock_morph_validation_response
+                elif args[1] == "/health":
+                    return mock_morph_healthy_response
+                elif args[1] == "/apply":
+                    # Timeout during apply
+                    raise MorphTimeoutError("Apply request timed out")
+                return {}
+
+            mock_request.side_effect = side_effect
+
+            manager = ApplyToolManager.from_settings(
+                morph_enabled=True,
+                morph_api_key=test_api_key,
+                fallback_on_error=True,
+            )
+
+            # Should not raise, should fallback
+            result, method = manager.apply_with_fallback(
+                file_path="test.py",
+                content="x = 1",
+                instruction="Add type hint",
+            )
+
+            assert method == ApplyMethod.DEFAULT
+            assert result is None
+
+            manager.close()
+
+    # =========================================================================
+    # Test 4: Verify No User Operations Blocked
+    # =========================================================================
+
+    def test_all_failure_modes_return_usable_default_tools(
+        self,
+        test_api_key,
+        mock_morph_validation_response,
+    ):
+        """Verify all failure modes return default tools that can be used."""
+        failure_scenarios = [
+            ("disabled", {"morph_enabled": False, "morph_api_key": ""}),
+            ("no_api_key", {"morph_enabled": True, "morph_api_key": ""}),
+            ("whitespace_key", {"morph_enabled": True, "morph_api_key": "   "}),
+        ]
+
+        for scenario_name, settings in failure_scenarios:
+            manager = ApplyToolManager.from_settings(**settings)
+
+            selection = manager.select_apply_tools()
+
+            # Critical: must return usable tools, never empty or None
+            assert selection.tools is not None, f"Failed for {scenario_name}"
+            assert len(selection.tools) > 0, f"No tools for {scenario_name}"
+            assert "Edit" in selection.tools, f"Edit missing for {scenario_name}"
+            assert "Write" in selection.tools, f"Write missing for {scenario_name}"
+
+            manager.close()
+
+    def test_morph_failures_never_raise_exceptions_with_fallback_enabled(
+        self,
+        test_api_key,
+    ):
+        """Verify Morph failures never raise exceptions when fallback is enabled."""
+        error_types = [
+            MorphAPIError("ERROR", "Some error", 500),
+            MorphTimeoutError("Timeout"),
+            MorphConnectionError("Connection failed"),
+        ]
+
+        for error in error_types:
+            with patch.object(MorphClient, "_make_request") as mock_request:
+                mock_request.side_effect = error
+
+                manager = ApplyToolManager.from_settings(
+                    morph_enabled=True,
+                    morph_api_key=test_api_key,
+                    fallback_on_error=True,
+                )
+
+                # Should not raise any exception
+                try:
+                    result, method = manager.apply_with_fallback(
+                        file_path="test.py",
+                        content="code",
+                        instruction="fix",
+                    )
+                    # Should indicate fallback without exception
+                    assert method == ApplyMethod.DEFAULT
+                except Exception as e:
+                    pytest.fail(
+                        f"Unexpected exception with {type(error).__name__}: {e}"
+                    )
+                finally:
+                    manager.close()
+
+    def test_get_apply_tools_always_returns_usable_list(self, test_api_key):
+        """Verify get_apply_tools always returns a usable list of tools."""
+        with patch.object(MorphClient, "_make_request") as mock_request:
+            # Simulate various failures
+            mock_request.side_effect = MorphConnectionError("Connection refused")
+
+            # Even with failures, should return default tools
+            tools = get_apply_tools(
+                morph_enabled=True,
+                morph_api_key=test_api_key,
+            )
+
+            assert tools is not None
+            assert len(tools) > 0
+            assert tools == list(DEFAULT_APPLY_TOOLS)
+
+    def test_select_apply_method_always_returns_valid_selection(self, test_api_key):
+        """Verify select_apply_method always returns valid selection."""
+        with patch.object(MorphClient, "_make_request") as mock_request:
+            mock_request.side_effect = MorphTimeoutError("Timeout")
+
+            selection = select_apply_method(
+                morph_enabled=True,
+                morph_api_key=test_api_key,
+            )
+
+            # Must have valid selection data
+            assert selection is not None
+            assert selection.method in [ApplyMethod.MORPH, ApplyMethod.DEFAULT]
+            assert selection.tools is not None
+            assert len(selection.tools) > 0
+
+    def test_rapid_failure_recovery(
+        self,
+        test_api_key,
+        mock_morph_validation_response,
+        mock_morph_healthy_response,
+        mock_morph_apply_response,
+    ):
+        """Test that system recovers rapidly after failures - via manager recreation."""
+        # This test demonstrates that after failures, a new manager instance
+        # can successfully connect when the service recovers.
+        # In real scenarios, the UI would create a new manager on settings change.
+
+        with patch.object(MorphClient, "_make_request") as mock_request:
+            # First attempt: service is down
+            mock_request.side_effect = MorphConnectionError("Temporary network issue")
+
+            manager1 = ApplyToolManager.from_settings(
+                morph_enabled=True,
+                morph_api_key=test_api_key,
+            )
+
+            # First attempt fails gracefully
+            selection1 = manager1.select_apply_tools()
+            assert selection1.method == ApplyMethod.DEFAULT
+            manager1.close()
+
+        # Service recovers - new manager can connect
+        with patch.object(MorphClient, "_make_request") as mock_request:
+            mock_request.side_effect = [
+                mock_morph_validation_response,
+                mock_morph_healthy_response,
+            ]
+
+            # Create new manager after service recovery
+            manager2 = ApplyToolManager.from_settings(
+                morph_enabled=True,
+                morph_api_key=test_api_key,
+            )
+
+            # Second manager should succeed
+            selection2 = manager2.select_apply_tools()
+            assert selection2.method == ApplyMethod.MORPH
+
+            manager2.close()
+
+    def test_partial_failure_graceful_degradation(
+        self,
+        test_api_key,
+        mock_morph_validation_response,
+        mock_morph_healthy_response,
+    ):
+        """Test graceful degradation when Morph partially fails (validation ok, apply fails)."""
+        with patch.object(MorphClient, "_make_request") as mock_request:
+
+            def side_effect(*args, **kwargs):
+                if "/validate" in args[1]:
+                    return mock_morph_validation_response
+                elif args[1] == "/health":
+                    return mock_morph_healthy_response
+                elif args[1] == "/apply":
+                    # Apply fails with server error
+                    raise MorphAPIError(
+                        code="PROCESSING_ERROR",
+                        message="Internal server error",
+                        status_code=500,
+                    )
+                return {}
+
+            mock_request.side_effect = side_effect
+
+            manager = ApplyToolManager.from_settings(
+                morph_enabled=True,
+                morph_api_key=test_api_key,
+                fallback_on_error=True,
+            )
+
+            # Selection says Morph is available
+            selection = manager.select_apply_tools()
+            assert selection.method == ApplyMethod.MORPH
+
+            # But apply fails and falls back gracefully
+            result, method = manager.apply_with_fallback(
+                file_path="test.py",
+                content="x = 1",
+                instruction="fix",
+            )
+
+            assert method == ApplyMethod.DEFAULT
+            assert result is None  # Indicates caller should use default
+
+            manager.close()
+
+
 class TestEndToEndFlow:
     """
     End-to-end integration tests simulating the full flow from
