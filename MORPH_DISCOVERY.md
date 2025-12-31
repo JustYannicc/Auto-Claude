@@ -1,9 +1,9 @@
 # Morph Service Discovery
 
-## Status: API Test Script Created - Awaiting Credentials
+## Status: Functional Differences Documented
 **Date:** December 31, 2025
 **Purpose:** Document Morph service identity, documentation, and API access for integration into Auto-Claude
-**Current Subtask:** subtask-1-3 - Test Morph API with sample credentials
+**Current Subtask:** subtask-1-4 - Document functional differences between Morph and default apply tools (COMPLETED)
 
 ---
 
@@ -751,7 +751,291 @@ OVERALL: ✓ ALL TESTS PASSED
 
 ---
 
-## 8. Next Steps
+## 8. Functional Differences: Morph vs Default Apply Tools
+
+### 8.1 Overview
+
+This section documents the key functional differences between Morph Fast Apply and the default apply tools (Edit, Write, Bash) to guide implementation decisions and help users understand when each tool is most appropriate.
+
+### 8.2 Default Apply Tools Summary
+
+Auto-Claude uses three default apply tools from the Claude Agent SDK:
+
+| Tool | Purpose | Operation Model |
+|------|---------|-----------------|
+| **Edit** | Replace specific strings in files | Find & replace exact match |
+| **Write** | Create or overwrite entire files | Full file replacement |
+| **Bash** | Execute shell commands | Command execution with file operations |
+
+#### 8.2.1 Edit Tool
+
+**How it works:**
+- Requires `old_string` (exact text to find) and `new_string` (replacement text)
+- Performs exact string matching - the `old_string` must exist verbatim in the file
+- Fails if `old_string` is not found or not unique (unless `replace_all` is used)
+- Best for targeted, surgical changes where the exact text is known
+
+**Strengths:**
+- Precise and deterministic - no AI interpretation needed
+- Fast for small, targeted edits
+- No external API dependencies
+- Works offline
+
+**Limitations:**
+- Requires exact string match - sensitive to whitespace and formatting
+- Must know the exact content to replace
+- Not suitable for semantic/conceptual edits (e.g., "add error handling")
+- Complex multi-location edits require multiple tool calls
+
+**Example:**
+```python
+# Edit tool usage - requires exact string match
+Edit(
+    file_path="src/utils.py",
+    old_string="def add(a, b):\n    return a + b",
+    new_string="def add(a: int, b: int) -> int:\n    return a + b"
+)
+```
+
+#### 8.2.2 Write Tool
+
+**How it works:**
+- Overwrites entire file content with new content
+- Creates file if it doesn't exist
+- Requires reading file first to preserve unchanged content
+
+**Strengths:**
+- Simple and reliable
+- Can create new files
+- No matching requirements
+
+**Limitations:**
+- Requires sending entire file content (inefficient for large files)
+- Risk of losing content if not careful
+- No partial update capability
+
+**Example:**
+```python
+# Write tool usage - full file replacement
+Write(
+    file_path="src/new_file.py",
+    content="# New file\ndef hello():\n    print('Hello')\n"
+)
+```
+
+#### 8.2.3 Bash Tool
+
+**How it works:**
+- Executes shell commands that may modify files
+- Can use sed, awk, cat, etc. for file operations
+- Provides full shell access
+
+**Strengths:**
+- Flexible and powerful
+- Can perform complex file operations
+- Useful for bulk operations
+
+**Limitations:**
+- Security considerations
+- Platform-dependent (shell syntax)
+- Error handling can be complex
+
+---
+
+### 8.3 Morph Fast Apply
+
+**How it works:**
+- Sends original content + natural language instruction to Morph API
+- AI model interprets the instruction and generates transformed content
+- Returns new file content with applied changes
+- Provides confidence score and change descriptions
+
+**Strengths:**
+- **Semantic Understanding:** Can interpret high-level instructions ("add error handling", "make this function async")
+- **Context-Aware:** Understands code structure, not just text patterns
+- **Single Request:** Complex multi-location edits in one API call
+- **Language-Aware:** Optimized for specific programming languages
+- **Confidence Scoring:** Provides confidence level for applied changes
+
+**Limitations:**
+- **External Dependency:** Requires network access and API availability
+- **API Key Required:** Users must obtain and configure API credentials
+- **Cost:** API usage may incur costs depending on Morph's pricing
+- **Latency:** Network round-trip adds latency vs local operations
+- **Non-Deterministic:** AI-based changes may vary between calls
+
+**Example:**
+```python
+# Morph Fast Apply - natural language instruction
+morph_client.apply(
+    file_path="src/utils.py",
+    original_content="def add(a, b):\n    return a + b",
+    instruction="Add type hints to the function",
+    language="python"
+)
+# Returns transformed content with type hints applied
+```
+
+---
+
+### 8.4 Comparison Matrix
+
+| Feature | Edit | Write | Bash | Morph Fast Apply |
+|---------|------|-------|------|------------------|
+| **Operation Type** | String replacement | Full file write | Shell commands | AI transformation |
+| **Input Required** | Exact old/new strings | Full file content | Shell command | Instruction + content |
+| **Matching** | Exact string match | N/A | Pattern-based | Semantic understanding |
+| **Offline Support** | Yes | Yes | Yes | No |
+| **External API** | No | No | No | Yes (Morph API) |
+| **API Key Needed** | No | No | No | Yes |
+| **Deterministic** | Yes | Yes | Yes | No (AI-based) |
+| **Multi-Edit Single Call** | No | Yes (full file) | Possible | Yes |
+| **Semantic Edits** | No | No | Limited | Yes |
+| **Language Awareness** | No | No | No | Yes |
+| **Confidence Score** | N/A | N/A | N/A | Yes |
+| **Network Required** | No | No | No | Yes |
+| **Error Recovery** | Immediate | Immediate | Command-based | Fallback to default |
+
+---
+
+### 8.5 When to Use Each Tool
+
+#### Use **Edit Tool** When:
+- You know the exact text to replace
+- Making small, targeted changes
+- Working offline or without network access
+- Changes are simple string substitutions
+- Deterministic, repeatable results are required
+
+#### Use **Write Tool** When:
+- Creating new files
+- Completely rewriting file content
+- The entire file content needs to be controlled
+- Working with small files where efficiency isn't critical
+
+#### Use **Bash Tool** When:
+- Complex file operations are needed
+- Bulk operations across many files
+- System-level operations required
+- Working with shell-based workflows
+
+#### Use **Morph Fast Apply** When:
+- Making semantic/conceptual changes ("add logging", "refactor to async")
+- The exact text to change is unknown or complex to specify
+- Multiple related changes needed across the file
+- Working with specific language idioms or patterns
+- Speed is prioritized and network latency is acceptable
+- AI-assisted code transformation provides value
+
+---
+
+### 8.6 Integration Strategy for Auto-Claude
+
+Based on these differences, the recommended integration strategy is:
+
+#### 8.6.1 Selection Logic
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Apply Operation Received                      │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+                    ┌─────────────────┐
+                    │ Morph Enabled?  │
+                    └─────────────────┘
+                        │         │
+                       No        Yes
+                        │         │
+                        │         ▼
+                        │  ┌──────────────────┐
+                        │  │ API Key Valid?   │
+                        │  └──────────────────┘
+                        │      │         │
+                        │     No        Yes
+                        │      │         │
+                        │      │         ▼
+                        │      │  ┌──────────────────┐
+                        │      │  │ Service Healthy? │
+                        │      │  └──────────────────┘
+                        │      │      │         │
+                        │      │     No        Yes
+                        │      │      │         │
+                        │      │      │         ▼
+                        │      │      │  ┌──────────────────┐
+                        │      │      │  │  USE MORPH       │
+                        │      │      │  │  Fast Apply      │
+                        │      │      │  └──────────────────┘
+                        │      │      │         │
+                        │      │      │     Success?
+                        │      │      │    │        │
+                        │      │      │   No       Yes ─────► Done
+                        │      │      │    │
+                        ▼      ▼      ▼    ▼
+                    ┌─────────────────────────────┐
+                    │     USE DEFAULT TOOLS       │
+                    │  (Edit/Write based on need) │
+                    └─────────────────────────────┘
+```
+
+#### 8.6.2 Fallback Scenarios
+
+The system falls back to default tools when:
+
+| Scenario | Detection | Fallback Action |
+|----------|-----------|-----------------|
+| Morph disabled | `settings.morphEnabled === false` | Use Edit/Write directly |
+| No API key | `settings.morphApiKey` is empty | Use Edit/Write directly |
+| Invalid API key | 401 response from Morph | Log warning, use Edit/Write |
+| Service unavailable | Health check fails or timeout | Use Edit/Write, cache status |
+| Rate limited | 429 response | Retry with backoff, then fallback |
+| Processing error | 5xx response | Retry once, then fallback |
+
+#### 8.6.3 User Notification Strategy
+
+| Event | User Notification |
+|-------|-------------------|
+| Morph succeeds | None (silent) |
+| Fallback due to disabled | None (expected behavior) |
+| Fallback due to invalid key | Toast: "Invalid Morph API key. Using default apply." |
+| Fallback due to service down | Toast: "Morph service unavailable. Using default apply." |
+| Fallback due to rate limit | Toast: "Morph rate limit reached. Using default apply." |
+
+---
+
+### 8.7 Performance Considerations
+
+#### 8.7.1 Latency Comparison (Estimated)
+
+| Tool | Typical Latency | Notes |
+|------|-----------------|-------|
+| Edit | < 10ms | Local file operation |
+| Write | < 10ms | Local file operation |
+| Bash | 10-100ms | Process spawn + execution |
+| Morph | 100-500ms | Network round-trip + AI processing |
+
+#### 8.7.2 When Morph is "Faster"
+
+Despite higher latency, Morph can be "faster" in these scenarios:
+
+1. **Complex Multi-Edit:** A single Morph call vs multiple Edit calls
+2. **Semantic Changes:** Morph understands intent vs manually crafting exact strings
+3. **Unknown Content:** When the exact text to replace is unknown
+4. **Developer Time:** Faster to write "add type hints" than specify exact changes
+
+---
+
+### 8.8 Recommendations for Implementation
+
+1. **Default to Edit/Write:** Keep default tools as the primary mechanism
+2. **Morph as Enhancement:** Offer Morph as an optional enhancement for users with API keys
+3. **Transparent Fallback:** Always fall back silently to ensure operations complete
+4. **User Control:** Let users enable/disable Morph and see which tool was used
+5. **Monitor Performance:** Track Morph success rate and latency for optimization
+
+---
+
+## 9. Next Steps
 
 Once API credentials are obtained:
 
@@ -760,18 +1044,19 @@ Once API credentials are obtained:
 3. [ ] Run test script: `python scripts/test_morph_api.py --json`
 4. [ ] Update section 7.6 with actual test results
 5. [ ] Verify actual API endpoints match documented specification
-6. [ ] Proceed to subtask-1-4: Document functional differences
+6. [x] Document functional differences between Morph and default apply tools (Section 8)
+7. [ ] Proceed to Phase 2: Backend Foundation
 
 ---
 
-## 9. References
+## 10. References
 
 - **Spec:** `.auto-claude/specs/002-implement-morph-fast-apply-as-configurable-apply-t/spec.md`
 - **Implementation Plan:** `.auto-claude/specs/002-implement-morph-fast-apply-as-configurable-apply-t/implementation_plan.json`
 
 ---
 
-## 10. Verification Checklist
+## 11. Verification Checklist
 
 This API specification document includes:
 
@@ -781,6 +1066,7 @@ This API specification document includes:
 - [x] **Error Handling:** HTTP status codes, error response format, and common error codes
 - [x] **Rate Limits:** Expected limits and retry strategies
 - [x] **Implementation Guidance:** Python client example and fallback strategy
+- [x] **Functional Differences:** Comprehensive comparison of Morph vs default apply tools (Section 8)
 
 **Items Pending Stakeholder Verification:**
 - [ ] Base URL confirmation
