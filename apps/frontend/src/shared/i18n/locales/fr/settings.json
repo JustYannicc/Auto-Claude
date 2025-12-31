@@ -44,6 +44,10 @@
     "debug": {
       "title": "Debug & Logs",
       "description": "Outils de dépannage"
+    },
+    "morph": {
+      "title": "Morph Fast Apply",
+      "description": "Application de code par IA"
     }
   },
   "language": {
