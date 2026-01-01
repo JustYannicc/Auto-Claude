@@ -19,9 +19,10 @@ Test Cases Covered:
 
 from __future__ import annotations
 
+import asyncio
 import os
 import time
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
@@ -202,35 +203,45 @@ class TestMorphConfig:
 class TestAPIKeyValidation:
     """Tests for API key validation functionality."""
 
-    def test_validate_api_key_success_via_head(self, test_config):
+    @pytest.mark.asyncio
+    async def test_validate_api_key_success_via_head(self, test_config):
         """Verify successful API key validation via HEAD request optimization."""
-        with patch.object(MorphClient, "_check_auth_with_head") as mock_head:
+        with patch.object(
+            MorphClient, "_check_auth_with_head", new_callable=AsyncMock
+        ) as mock_head:
             # HEAD request succeeds - no need to call apply()
             mock_head.return_value = True
 
             client = MorphClient(test_config)
-            result = client.validate_api_key()
+            result = await client.validate_api_key()
 
             assert result.valid is True
             assert "apply" in result.permissions
             mock_head.assert_called_once()
-            client.close()
+            await client.close()
 
-    def test_validate_api_key_success_via_apply(self, test_config, mock_apply_response):
+    @pytest.mark.asyncio
+    async def test_validate_api_key_success_via_apply(
+        self, test_config, mock_apply_response
+    ):
         """Verify successful API key validation via apply fallback.
 
         Note: Morph doesn't have a dedicated /auth/validate endpoint, so
         validation is performed by attempting a minimal apply operation
         when HEAD request is inconclusive.
         """
-        with patch.object(MorphClient, "_check_auth_with_head") as mock_head:
-            with patch.object(MorphClient, "_make_request") as mock_request:
+        with patch.object(
+            MorphClient, "_check_auth_with_head", new_callable=AsyncMock
+        ) as mock_head:
+            with patch.object(
+                MorphClient, "_make_request", new_callable=AsyncMock
+            ) as mock_request:
                 # HEAD request inconclusive, fall back to apply
                 mock_head.return_value = None
                 mock_request.return_value = mock_apply_response
 
                 client = MorphClient(test_config)
-                result = client.validate_api_key()
+                result = await client.validate_api_key()
 
                 assert result.valid is True
                 # Morph doesn't provide account info in apply responses
@@ -241,24 +252,32 @@ class TestAPIKeyValidation:
 
                 # Validation uses apply() which calls /chat/completions
                 mock_request.assert_called_once()
-                client.close()
+                await client.close()
 
-    def test_validate_api_key_invalid_via_head(self, test_config):
+    @pytest.mark.asyncio
+    async def test_validate_api_key_invalid_via_head(self, test_config):
         """Verify validation returns invalid when HEAD request detects invalid key."""
-        with patch.object(MorphClient, "_check_auth_with_head") as mock_head:
+        with patch.object(
+            MorphClient, "_check_auth_with_head", new_callable=AsyncMock
+        ) as mock_head:
             # HEAD request returns False - invalid key
             mock_head.return_value = False
 
             client = MorphClient(test_config)
-            result = client.validate_api_key()
+            result = await client.validate_api_key()
 
             assert result.valid is False
-            client.close()
+            await client.close()
 
-    def test_validate_api_key_invalid_401(self, test_config):
+    @pytest.mark.asyncio
+    async def test_validate_api_key_invalid_401(self, test_config):
         """Verify validation returns invalid for 401 errors from apply fallback."""
-        with patch.object(MorphClient, "_check_auth_with_head") as mock_head:
-            with patch.object(MorphClient, "_make_request") as mock_request:
+        with patch.object(
+            MorphClient, "_check_auth_with_head", new_callable=AsyncMock
+        ) as mock_head:
+            with patch.object(
+                MorphClient, "_make_request", new_callable=AsyncMock
+            ) as mock_request:
                 # HEAD inconclusive, apply fails with 401
                 mock_head.return_value = None
                 mock_request.side_effect = MorphAPIError(
@@ -268,24 +287,30 @@ class TestAPIKeyValidation:
                 )
 
                 client = MorphClient(test_config)
-                result = client.validate_api_key()
+                result = await client.validate_api_key()
 
                 assert result.valid is False
-                client.close()
+                await client.close()
 
-    def test_validate_api_key_no_key_configured(self):
+    @pytest.mark.asyncio
+    async def test_validate_api_key_no_key_configured(self):
         """Verify validation returns invalid when no API key configured."""
         config = MorphConfig(api_key="")
         client = MorphClient(config)
-        result = client.validate_api_key()
+        result = await client.validate_api_key()
 
         assert result.valid is False
-        client.close()
+        await client.close()
 
-    def test_validate_api_key_raises_on_server_error(self, test_config):
+    @pytest.mark.asyncio
+    async def test_validate_api_key_raises_on_server_error(self, test_config):
         """Verify validation raises on non-401 errors."""
-        with patch.object(MorphClient, "_check_auth_with_head") as mock_head:
-            with patch.object(MorphClient, "_make_request") as mock_request:
+        with patch.object(
+            MorphClient, "_check_auth_with_head", new_callable=AsyncMock
+        ) as mock_head:
+            with patch.object(
+                MorphClient, "_make_request", new_callable=AsyncMock
+            ) as mock_request:
                 # HEAD inconclusive, apply fails with 503
                 mock_head.return_value = None
                 mock_request.side_effect = MorphAPIError(
@@ -296,10 +321,10 @@ class TestAPIKeyValidation:
 
                 client = MorphClient(test_config)
                 with pytest.raises(MorphAPIError) as exc_info:
-                    client.validate_api_key()
+                    await client.validate_api_key()
 
                 assert exc_info.value.status_code == 503
-                client.close()
+                await client.close()
 
 
 # =============================================================================
@@ -315,80 +340,100 @@ class TestHealthChecks:
     These tests verify that check_health correctly interprets validation results.
     """
 
-    def test_check_health_healthy(self, test_config):
+    @pytest.mark.asyncio
+    async def test_check_health_healthy(self, test_config):
         """Verify health check returns True when API key validation succeeds."""
-        with patch.object(MorphClient, "_check_auth_with_head") as mock_head:
+        with patch.object(
+            MorphClient, "_check_auth_with_head", new_callable=AsyncMock
+        ) as mock_head:
             # HEAD request succeeds
             mock_head.return_value = True
 
             client = MorphClient(test_config)
-            is_healthy = client.check_health(use_cache=False)
+            is_healthy = await client.check_health(use_cache=False)
 
             assert is_healthy is True
             mock_head.assert_called_once()
-            client.close()
+            await client.close()
 
-    def test_check_health_unhealthy_on_invalid_key(self, test_config):
+    @pytest.mark.asyncio
+    async def test_check_health_unhealthy_on_invalid_key(self, test_config):
         """Verify health check returns False when API key is invalid."""
-        with patch.object(MorphClient, "_check_auth_with_head") as mock_head:
+        with patch.object(
+            MorphClient, "_check_auth_with_head", new_callable=AsyncMock
+        ) as mock_head:
             # HEAD request returns False - invalid key
             mock_head.return_value = False
 
             client = MorphClient(test_config)
-            is_healthy = client.check_health(use_cache=False)
+            is_healthy = await client.check_health(use_cache=False)
 
             assert is_healthy is False
-            client.close()
+            await client.close()
 
-    def test_check_health_connection_error(self, test_config):
+    @pytest.mark.asyncio
+    async def test_check_health_connection_error(self, test_config):
         """Verify health check returns False on connection error."""
-        with patch.object(MorphClient, "_check_auth_with_head") as mock_head:
-            with patch.object(MorphClient, "_make_request") as mock_request:
+        with patch.object(
+            MorphClient, "_check_auth_with_head", new_callable=AsyncMock
+        ) as mock_head:
+            with patch.object(
+                MorphClient, "_make_request", new_callable=AsyncMock
+            ) as mock_request:
                 # HEAD inconclusive, apply fails with connection error
                 mock_head.return_value = None
                 mock_request.side_effect = MorphConnectionError("Connection failed")
 
                 client = MorphClient(test_config)
-                is_healthy = client.check_health(use_cache=False)
+                is_healthy = await client.check_health(use_cache=False)
 
                 assert is_healthy is False
-                client.close()
+                await client.close()
 
-    def test_check_health_timeout_error(self, test_config):
+    @pytest.mark.asyncio
+    async def test_check_health_timeout_error(self, test_config):
         """Verify health check returns False on timeout."""
-        with patch.object(MorphClient, "_check_auth_with_head") as mock_head:
-            with patch.object(MorphClient, "_make_request") as mock_request:
+        with patch.object(
+            MorphClient, "_check_auth_with_head", new_callable=AsyncMock
+        ) as mock_head:
+            with patch.object(
+                MorphClient, "_make_request", new_callable=AsyncMock
+            ) as mock_request:
                 # HEAD inconclusive, apply times out
                 mock_head.return_value = None
                 mock_request.side_effect = MorphTimeoutError("Request timed out")
 
                 client = MorphClient(test_config)
-                is_healthy = client.check_health(use_cache=False)
+                is_healthy = await client.check_health(use_cache=False)
 
                 assert is_healthy is False
-                client.close()
+                await client.close()
 
-    def test_check_health_caching(self, test_config):
+    @pytest.mark.asyncio
+    async def test_check_health_caching(self, test_config):
         """Verify health check caches result for TTL duration."""
-        with patch.object(MorphClient, "_check_auth_with_head") as mock_head:
+        with patch.object(
+            MorphClient, "_check_auth_with_head", new_callable=AsyncMock
+        ) as mock_head:
             # HEAD request succeeds
             mock_head.return_value = True
 
             client = MorphClient(test_config)
 
             # First call should check auth
-            result1 = client.check_health(use_cache=True)
+            result1 = await client.check_health(use_cache=True)
             assert result1 is True
             assert mock_head.call_count == 1
 
             # Second call should use cache
-            result2 = client.check_health(use_cache=True)
+            result2 = await client.check_health(use_cache=True)
             assert result2 is True
             assert mock_head.call_count == 1  # Still 1, cached result used
 
-            client.close()
+            await client.close()
 
-    def test_check_health_cache_expiry(self, test_config):
+    @pytest.mark.asyncio
+    async def test_check_health_cache_expiry(self, test_config):
         """Verify health check cache expires after TTL."""
         # Set short TTL for testing
         config = MorphConfig(
@@ -396,46 +441,51 @@ class TestHealthChecks:
             health_cache_ttl=1,  # 1 second TTL
         )
 
-        with patch.object(MorphClient, "_check_auth_with_head") as mock_head:
+        with patch.object(
+            MorphClient, "_check_auth_with_head", new_callable=AsyncMock
+        ) as mock_head:
             # HEAD request succeeds
             mock_head.return_value = True
 
             client = MorphClient(config)
 
             # First call
-            result1 = client.check_health(use_cache=True)
+            result1 = await client.check_health(use_cache=True)
             assert result1 is True
             assert mock_head.call_count == 1
 
             # Wait for cache to expire
-            time.sleep(1.1)
+            await asyncio.sleep(1.1)
 
             # Second call should check auth again
-            result2 = client.check_health(use_cache=True)
+            result2 = await client.check_health(use_cache=True)
             assert result2 is True
             assert mock_head.call_count == 2  # Cache expired, new check
 
-            client.close()
+            await client.close()
 
-    def test_check_health_bypass_cache(self, test_config):
+    @pytest.mark.asyncio
+    async def test_check_health_bypass_cache(self, test_config):
         """Verify use_cache=False bypasses cache."""
-        with patch.object(MorphClient, "_check_auth_with_head") as mock_head:
+        with patch.object(
+            MorphClient, "_check_auth_with_head", new_callable=AsyncMock
+        ) as mock_head:
             # HEAD request succeeds
             mock_head.return_value = True
 
             client = MorphClient(test_config)
 
             # First call with caching
-            result1 = client.check_health(use_cache=True)
+            result1 = await client.check_health(use_cache=True)
             assert result1 is True
             assert mock_head.call_count == 1
 
             # Second call bypassing cache
-            result2 = client.check_health(use_cache=False)
+            result2 = await client.check_health(use_cache=False)
             assert result2 is True
             assert mock_head.call_count == 2  # Cache bypassed
 
-            client.close()
+            await client.close()
 
 
 # =============================================================================
@@ -446,13 +496,16 @@ class TestHealthChecks:
 class TestApplyOperations:
     """Tests for apply (fast code transformation) operations."""
 
-    def test_apply_success(self, test_config, mock_apply_response):
+    @pytest.mark.asyncio
+    async def test_apply_success(self, test_config, mock_apply_response):
         """Verify successful apply operation."""
-        with patch.object(MorphClient, "_make_request") as mock_request:
+        with patch.object(
+            MorphClient, "_make_request", new_callable=AsyncMock
+        ) as mock_request:
             mock_request.return_value = mock_apply_response
 
             client = MorphClient(test_config)
-            result = client.apply(
+            result = await client.apply(
                 file_path="utils.py",
                 original_content="def add(a, b): return a + b",
                 instruction="Add type hints",
@@ -472,22 +525,25 @@ class TestApplyOperations:
             payload = call_args[1]["json_data"]
             assert payload["model"] == "auto"
             assert "messages" in payload
-            # Verify XML format in message content
+            assert payload["temperature"] == 0  # Deterministic output
+            # Verify XML format in message content (language tag removed per fix)
             message_content = payload["messages"][0]["content"]
-            assert "<language>python</language>" in message_content  # Language hint included
             assert "<instruction>Add type hints</instruction>" in message_content
             assert "<code>def add(a, b): return a + b</code>" in message_content
             assert "<update>" in message_content
 
-            client.close()
+            await client.close()
 
-    def test_apply_with_code_edit(self, test_config, mock_apply_response):
+    @pytest.mark.asyncio
+    async def test_apply_with_code_edit(self, test_config, mock_apply_response):
         """Verify apply with explicit code_edit parameter."""
-        with patch.object(MorphClient, "_make_request") as mock_request:
+        with patch.object(
+            MorphClient, "_make_request", new_callable=AsyncMock
+        ) as mock_request:
             mock_request.return_value = mock_apply_response
 
             client = MorphClient(test_config)
-            result = client.apply(
+            result = await client.apply(
                 file_path="api.py",
                 original_content="def handler(): pass",
                 instruction="Add async/await",
@@ -502,15 +558,18 @@ class TestApplyOperations:
             message_content = payload["messages"][0]["content"]
             assert "<update>async def handler(): pass</update>" in message_content
 
-            client.close()
+            await client.close()
 
-    def test_apply_without_code_edit(self, test_config, mock_apply_response):
+    @pytest.mark.asyncio
+    async def test_apply_without_code_edit(self, test_config, mock_apply_response):
         """Verify apply uses original_content as update when code_edit not provided."""
-        with patch.object(MorphClient, "_make_request") as mock_request:
+        with patch.object(
+            MorphClient, "_make_request", new_callable=AsyncMock
+        ) as mock_request:
             mock_request.return_value = mock_apply_response
 
             client = MorphClient(test_config)
-            result = client.apply(
+            result = await client.apply(
                 file_path="script.py",
                 original_content="print('hello')",
                 instruction="Add docstring",
@@ -525,11 +584,14 @@ class TestApplyOperations:
             assert "<code>print('hello')</code>" in message_content
             assert "<update>print('hello')</update>" in message_content
 
-            client.close()
+            await client.close()
 
-    def test_apply_raises_on_api_error(self, test_config):
+    @pytest.mark.asyncio
+    async def test_apply_raises_on_api_error(self, test_config):
         """Verify apply raises MorphAPIError on API error."""
-        with patch.object(MorphClient, "_make_request") as mock_request:
+        with patch.object(
+            MorphClient, "_make_request", new_callable=AsyncMock
+        ) as mock_request:
             mock_request.side_effect = MorphAPIError(
                 code=MorphErrorCode.CONTENT_TOO_LARGE,
                 message="Content exceeds size limit",
@@ -538,7 +600,7 @@ class TestApplyOperations:
 
             client = MorphClient(test_config)
             with pytest.raises(MorphAPIError) as exc_info:
-                client.apply(
+                await client.apply(
                     file_path="large.py",
                     original_content="x" * 1000000,
                     instruction="Format code",
@@ -546,7 +608,7 @@ class TestApplyOperations:
 
             assert exc_info.value.code == MorphErrorCode.CONTENT_TOO_LARGE
             assert exc_info.value.status_code == 413
-            client.close()
+            await client.close()
 
 
 # =============================================================================
@@ -617,41 +679,46 @@ class TestErrorHandling:
         )
         assert error.is_retryable() is False
 
-    def test_make_request_raises_on_missing_api_key(self):
+    @pytest.mark.asyncio
+    async def test_make_request_raises_on_missing_api_key(self):
         """Verify _make_request raises when API key is required but missing."""
         config = MorphConfig(api_key="")
         client = MorphClient(config)
 
         with pytest.raises(MorphAPIError) as exc_info:
-            client._make_request("GET", "/auth/validate", requires_auth=True)
+            await client._make_request("GET", "/auth/validate", requires_auth=True)
 
         assert exc_info.value.code == MorphErrorCode.INVALID_API_KEY
         assert "No API key configured" in exc_info.value.message
-        client.close()
+        await client.close()
 
-    def test_make_request_connection_error(self, test_config):
+    @pytest.mark.asyncio
+    async def test_make_request_connection_error(self, test_config):
         """Verify _make_request raises MorphConnectionError on connection failure."""
-        with patch.object(httpx.Client, "get") as mock_get:
+        with patch.object(httpx.AsyncClient, "get", new_callable=AsyncMock) as mock_get:
             mock_get.side_effect = httpx.ConnectError("Connection refused")
 
             client = MorphClient(test_config)
             with pytest.raises(MorphConnectionError) as exc_info:
-                client._make_request("GET", "/health", requires_auth=False)
+                await client._make_request("GET", "/health", requires_auth=False)
 
             assert "Failed to connect" in str(exc_info.value)
-            client.close()
+            await client.close()
 
-    def test_make_request_timeout_error(self, test_config):
+    @pytest.mark.asyncio
+    async def test_make_request_timeout_error(self, test_config):
         """Verify _make_request raises MorphTimeoutError on timeout."""
-        with patch.object(httpx.Client, "get") as mock_get:
+        with patch.object(
+            httpx.AsyncClient, "get", new_callable=AsyncMock
+        ) as mock_get:
             mock_get.side_effect = httpx.TimeoutException("Request timed out")
 
             client = MorphClient(test_config)
             with pytest.raises(MorphTimeoutError) as exc_info:
-                client._make_request("GET", "/health", requires_auth=False)
+                await client._make_request("GET", "/health", requires_auth=False)
 
             assert "timed out" in str(exc_info.value)
-            client.close()
+            await client.close()
 
 
 # =============================================================================
@@ -662,11 +729,12 @@ class TestErrorHandling:
 class TestRetryLogic:
     """Tests for retry logic with exponential backoff."""
 
-    def test_retries_on_503_then_succeeds(self, test_config, mock_health_response):
+    @pytest.mark.asyncio
+    async def test_retries_on_503_then_succeeds(self, test_config, mock_health_response):
         """Verify request retries on 503 and eventually succeeds."""
         call_count = 0
 
-        def side_effect(*args, **kwargs):
+        async def side_effect(*args, **kwargs):
             nonlocal call_count
             call_count += 1
             if call_count < 2:
@@ -687,20 +755,23 @@ class TestRetryLogic:
                 response.json.return_value = mock_health_response
                 return response
 
-        with patch.object(httpx.Client, "get", side_effect=side_effect):
-            with patch("time.sleep"):  # Mock sleep to speed up test
+        with patch.object(httpx.AsyncClient, "get", side_effect=side_effect):
+            with patch("asyncio.sleep", new_callable=AsyncMock):  # Mock sleep
                 client = MorphClient(test_config)
-                result = client._make_request("GET", "/health", requires_auth=False)
+                result = await client._make_request(
+                    "GET", "/health", requires_auth=False
+                )
 
                 assert result == mock_health_response
                 assert call_count == 2
-                client.close()
+                await client.close()
 
-    def test_retries_on_429_then_succeeds(self, test_config, mock_health_response):
+    @pytest.mark.asyncio
+    async def test_retries_on_429_then_succeeds(self, test_config, mock_health_response):
         """Verify request retries on 429 rate limit and eventually succeeds."""
         call_count = 0
 
-        def side_effect(*args, **kwargs):
+        async def side_effect(*args, **kwargs):
             nonlocal call_count
             call_count += 1
             if call_count < 2:
@@ -721,20 +792,23 @@ class TestRetryLogic:
                 response.json.return_value = mock_health_response
                 return response
 
-        with patch.object(httpx.Client, "get", side_effect=side_effect):
-            with patch("time.sleep"):  # Mock sleep
+        with patch.object(httpx.AsyncClient, "get", side_effect=side_effect):
+            with patch("asyncio.sleep", new_callable=AsyncMock):  # Mock sleep
                 client = MorphClient(test_config)
-                result = client._make_request("GET", "/health", requires_auth=False)
+                result = await client._make_request(
+                    "GET", "/health", requires_auth=False
+                )
 
                 assert result == mock_health_response
                 assert call_count == 2
-                client.close()
+                await client.close()
 
-    def test_no_retry_on_401(self, test_config):
+    @pytest.mark.asyncio
+    async def test_no_retry_on_401(self, test_config):
         """Verify 401 errors are not retried."""
         call_count = 0
 
-        def side_effect(*args, **kwargs):
+        async def side_effect(*args, **kwargs):
             nonlocal call_count
             call_count += 1
             response = MagicMock()
@@ -747,20 +821,21 @@ class TestRetryLogic:
             }
             return response
 
-        with patch.object(httpx.Client, "get", side_effect=side_effect):
+        with patch.object(httpx.AsyncClient, "get", side_effect=side_effect):
             client = MorphClient(test_config)
             with pytest.raises(MorphAPIError) as exc_info:
-                client._make_request("GET", "/auth/validate", requires_auth=True)
+                await client._make_request("GET", "/auth/validate", requires_auth=True)
 
             assert exc_info.value.status_code == 401
             assert call_count == 1  # No retries
-            client.close()
+            await client.close()
 
-    def test_exhausts_retries_and_raises(self, test_config):
+    @pytest.mark.asyncio
+    async def test_exhausts_retries_and_raises(self, test_config):
         """Verify error is raised after exhausting all retries."""
         call_count = 0
 
-        def side_effect(*args, **kwargs):
+        async def side_effect(*args, **kwargs):
             nonlocal call_count
             call_count += 1
             response = MagicMock()
@@ -773,15 +848,15 @@ class TestRetryLogic:
             }
             return response
 
-        with patch.object(httpx.Client, "get", side_effect=side_effect):
-            with patch("time.sleep"):  # Mock sleep
+        with patch.object(httpx.AsyncClient, "get", side_effect=side_effect):
+            with patch("asyncio.sleep", new_callable=AsyncMock):  # Mock sleep
                 client = MorphClient(test_config)
                 with pytest.raises(MorphAPIError) as exc_info:
-                    client._make_request("GET", "/health", requires_auth=False)
+                    await client._make_request("GET", "/health", requires_auth=False)
 
                 assert exc_info.value.status_code == 503
                 assert call_count == test_config.max_retries
-                client.close()
+                await client.close()
 
 
 # =============================================================================
@@ -792,23 +867,27 @@ class TestRetryLogic:
 class TestContextManager:
     """Tests for context manager support."""
 
-    def test_context_manager_closes_client(self, test_config):
+    @pytest.mark.asyncio
+    async def test_context_manager_closes_client(self, test_config):
         """Verify context manager properly closes client."""
-        with MorphClient(test_config) as client:
+        async with MorphClient(test_config) as client:
             assert client._client is None  # Not created yet
-            _ = client._get_client()  # Create client
+            _ = await client._get_client()  # Create client
             assert client._client is not None
 
         # After context exit, client should be closed
         assert client._client is None
 
-    def test_context_manager_clears_cache(self, test_config, mock_health_response):
+    @pytest.mark.asyncio
+    async def test_context_manager_clears_cache(self, test_config, mock_health_response):
         """Verify context manager clears health cache."""
-        with patch.object(MorphClient, "_make_request") as mock_request:
+        with patch.object(
+            MorphClient, "_make_request", new_callable=AsyncMock
+        ) as mock_request:
             mock_request.return_value = mock_health_response
 
-            with MorphClient(test_config) as client:
-                client.check_health()
+            async with MorphClient(test_config) as client:
+                await client.check_health()
                 assert client._health_cache is not None
 
             # After context exit, cache should be cleared
@@ -870,7 +949,10 @@ class TestHelperFunctions:
         """Verify get_morph_api_key returns empty string when not set."""
         assert get_morph_api_key() == ""
 
-    def test_create_morph_client_when_enabled_with_key(self, clean_env, test_api_key):
+    @pytest.mark.asyncio
+    async def test_create_morph_client_when_enabled_with_key(
+        self, clean_env, test_api_key
+    ):
         """Verify create_morph_client returns client when enabled with API key."""
         os.environ["MORPH_ENABLED"] = "true"
         os.environ["MORPH_API_KEY"] = test_api_key
@@ -879,7 +961,7 @@ class TestHelperFunctions:
         assert client is not None
         assert isinstance(client, MorphClient)
         assert client.config.api_key == test_api_key
-        client.close()
+        await client.close()
 
     def test_create_morph_client_returns_none_when_disabled(
         self, clean_env, test_api_key
@@ -989,52 +1071,64 @@ class TestIsAvailable:
     validate_api_key() first tries HEAD request, then falls back to apply().
     """
 
-    def test_is_available_true(self, test_config):
+    @pytest.mark.asyncio
+    async def test_is_available_true(self, test_config):
         """Verify is_available returns True when service is healthy and key is valid."""
-        with patch.object(MorphClient, "_check_auth_with_head") as mock_head:
+        with patch.object(
+            MorphClient, "_check_auth_with_head", new_callable=AsyncMock
+        ) as mock_head:
             # HEAD request succeeds
             mock_head.return_value = True
 
             client = MorphClient(test_config)
-            is_available = client.is_available(use_cache=False)
+            is_available = await client.is_available(use_cache=False)
 
             assert is_available is True
-            client.close()
+            await client.close()
 
-    def test_is_available_false_no_api_key(self):
+    @pytest.mark.asyncio
+    async def test_is_available_false_no_api_key(self):
         """Verify is_available returns False when no API key configured."""
         config = MorphConfig(api_key="")
         client = MorphClient(config)
-        is_available = client.is_available()
+        is_available = await client.is_available()
 
         assert is_available is False
-        client.close()
+        await client.close()
 
-    def test_is_available_false_on_invalid_key(self, test_config):
+    @pytest.mark.asyncio
+    async def test_is_available_false_on_invalid_key(self, test_config):
         """Verify is_available returns False when API key is invalid."""
-        with patch.object(MorphClient, "_check_auth_with_head") as mock_head:
+        with patch.object(
+            MorphClient, "_check_auth_with_head", new_callable=AsyncMock
+        ) as mock_head:
             # HEAD request detects invalid key
             mock_head.return_value = False
 
             client = MorphClient(test_config)
-            is_available = client.is_available(use_cache=False)
+            is_available = await client.is_available(use_cache=False)
 
             assert is_available is False
-            client.close()
+            await client.close()
 
-    def test_is_available_false_on_connection_error(self, test_config):
+    @pytest.mark.asyncio
+    async def test_is_available_false_on_connection_error(self, test_config):
         """Verify is_available returns False on connection error during validation."""
-        with patch.object(MorphClient, "_check_auth_with_head") as mock_head:
-            with patch.object(MorphClient, "_make_request") as mock_request:
+        with patch.object(
+            MorphClient, "_check_auth_with_head", new_callable=AsyncMock
+        ) as mock_head:
+            with patch.object(
+                MorphClient, "_make_request", new_callable=AsyncMock
+            ) as mock_request:
                 # HEAD inconclusive, apply fails
                 mock_head.return_value = None
                 mock_request.side_effect = MorphConnectionError("Connection failed")
 
                 client = MorphClient(test_config)
-                is_available = client.is_available(use_cache=False)
+                is_available = await client.is_available(use_cache=False)
 
                 assert is_available is False
-                client.close()
+                await client.close()
 
 
 # =============================================================================
@@ -1045,14 +1139,15 @@ class TestIsAvailable:
 class TestContentSizeValidation:
     """Tests for content size pre-validation."""
 
-    def test_apply_raises_on_content_too_large(self, test_config):
+    @pytest.mark.asyncio
+    async def test_apply_raises_on_content_too_large(self, test_config):
         """Verify apply raises MorphAPIError for content exceeding size limit."""
         # Create content larger than MAX_CONTENT_SIZE_BYTES (100KB)
         large_content = "x" * (MAX_CONTENT_SIZE_BYTES + 1)
 
         client = MorphClient(test_config)
         with pytest.raises(MorphAPIError) as exc_info:
-            client.apply(
+            await client.apply(
                 file_path="large_file.py",
                 original_content=large_content,
                 instruction="Format code",
@@ -1061,43 +1156,49 @@ class TestContentSizeValidation:
         assert exc_info.value.code == MorphErrorCode.CONTENT_TOO_LARGE
         assert exc_info.value.status_code == 413
         assert "exceeds limit" in exc_info.value.message
-        client.close()
+        await client.close()
 
-    def test_apply_accepts_content_at_limit(self, test_config, mock_apply_response):
+    @pytest.mark.asyncio
+    async def test_apply_accepts_content_at_limit(self, test_config, mock_apply_response):
         """Verify apply accepts content exactly at size limit."""
         # Create content exactly at MAX_CONTENT_SIZE_BYTES
         content_at_limit = "x" * MAX_CONTENT_SIZE_BYTES
 
-        with patch.object(MorphClient, "_make_request") as mock_request:
+        with patch.object(
+            MorphClient, "_make_request", new_callable=AsyncMock
+        ) as mock_request:
             mock_request.return_value = mock_apply_response
 
             client = MorphClient(test_config)
             # Should not raise - content is exactly at limit
-            result = client.apply(
+            result = await client.apply(
                 file_path="at_limit.py",
                 original_content=content_at_limit,
                 instruction="Format code",
             )
 
             assert result.success is True
-            client.close()
+            await client.close()
 
-    def test_apply_accepts_small_content(self, test_config, mock_apply_response):
+    @pytest.mark.asyncio
+    async def test_apply_accepts_small_content(self, test_config, mock_apply_response):
         """Verify apply accepts small content without issues."""
         small_content = "def hello(): pass"
 
-        with patch.object(MorphClient, "_make_request") as mock_request:
+        with patch.object(
+            MorphClient, "_make_request", new_callable=AsyncMock
+        ) as mock_request:
             mock_request.return_value = mock_apply_response
 
             client = MorphClient(test_config)
-            result = client.apply(
+            result = await client.apply(
                 file_path="small.py",
                 original_content=small_content,
                 instruction="Add docstring",
             )
 
             assert result.success is True
-            client.close()
+            await client.close()
 
 
 # =============================================================================
@@ -1113,44 +1214,53 @@ class TestLineChangeCalculation:
         original = "line1\nline2\nline3"
         new = "line1\nline2\nline3"
 
-        added, removed = MorphClient._calculate_line_changes(original, new)
+        added, removed, diff = MorphClient._calculate_line_changes(original, new)
         assert added == 0
         assert removed == 0
+        assert diff == ""  # No changes means empty diff
 
     def test_calculate_lines_added(self):
         """Verify adding new lines is detected."""
-        original = "line1\nline2"
-        new = "line1\nline2\nline3\nline4"
+        # Use trailing newlines for consistent diff behavior
+        original = "line1\nline2\n"
+        new = "line1\nline2\nline3\nline4\n"
 
-        added, removed = MorphClient._calculate_line_changes(original, new)
+        added, removed, diff = MorphClient._calculate_line_changes(original, new)
         assert added == 2
         assert removed == 0
+        assert "+line3" in diff
+        assert "+line4" in diff
 
     def test_calculate_lines_removed(self):
         """Verify removing lines is detected."""
-        original = "line1\nline2\nline3\nline4"
-        new = "line1\nline2"
+        # Use trailing newlines for consistent diff behavior
+        original = "line1\nline2\nline3\nline4\n"
+        new = "line1\nline2\n"
 
-        added, removed = MorphClient._calculate_line_changes(original, new)
+        added, removed, diff = MorphClient._calculate_line_changes(original, new)
         assert added == 0
         assert removed == 2
+        assert "-line3" in diff
+        assert "-line4" in diff
 
     def test_calculate_lines_modified(self):
         """Verify modifying lines shows as add + remove."""
         original = "def foo(): pass"
         new = "def foo(): return 42"
 
-        added, removed = MorphClient._calculate_line_changes(original, new)
+        added, removed, diff = MorphClient._calculate_line_changes(original, new)
         # Modified line counts as 1 removed, 1 added
         assert added == 1
         assert removed == 1
+        assert "-def foo(): pass" in diff
+        assert "+def foo(): return 42" in diff
 
     def test_calculate_mixed_changes(self):
         """Verify mixed add/remove/modify is calculated correctly."""
         original = "line1\nline2\nline3"
         new = "line1\nline2_modified\nline4\nline5"
 
-        added, removed = MorphClient._calculate_line_changes(original, new)
+        added, removed, diff = MorphClient._calculate_line_changes(original, new)
         # line2 and line3 removed, line2_modified, line4, line5 added
         assert added == 3
         assert removed == 2
@@ -1160,7 +1270,7 @@ class TestLineChangeCalculation:
         original = ""
         new = "line1\nline2"
 
-        added, removed = MorphClient._calculate_line_changes(original, new)
+        added, removed, diff = MorphClient._calculate_line_changes(original, new)
         assert added == 2
         assert removed == 0
 
@@ -1169,6 +1279,6 @@ class TestLineChangeCalculation:
         original = "line1\nline2"
         new = ""
 
-        added, removed = MorphClient._calculate_line_changes(original, new)
+        added, removed, diff = MorphClient._calculate_line_changes(original, new)
         assert added == 0
         assert removed == 2

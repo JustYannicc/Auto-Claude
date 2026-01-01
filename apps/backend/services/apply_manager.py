@@ -353,7 +353,8 @@ class ApplyToolManager:
             return False
 
         try:
-            result = self._morph_client.validate_api_key()
+            # Use sync wrapper since this method is not async
+            result = self._morph_client.validate_api_key_sync()
             self._api_key_validated = result.valid
             if not result.valid:
                 logger.warning("Morph API key validation failed")
@@ -393,7 +394,8 @@ class ApplyToolManager:
             return False, FallbackReason.INVALID_API_KEY
 
         try:
-            if not self._morph_client.check_health(
+            # Use sync wrapper since this method is not async
+            if not self._morph_client.check_health_sync(
                 use_cache=self.config.cache_availability
             ):
                 # check_health returns False for invalid API key or service issues
@@ -543,7 +545,8 @@ class ApplyToolManager:
             )
 
         try:
-            result = self._morph_client.apply(
+            # Use sync wrapper since this method is not async
+            result = self._morph_client.apply_sync(
                 file_path=file_path,
                 original_content=content,
                 instruction=instruction,
@@ -666,12 +669,12 @@ class ApplyToolManager:
         # Reinitialize Morph client if needed
         if self.config.morph_enabled and self.config.has_api_key():
             if self._morph_client:
-                self._morph_client.close()
+                self._morph_client.close_sync()
             self._morph_client = MorphClient(
                 MorphConfig(api_key=self.config.morph_api_key)
             )
         elif self._morph_client:
-            self._morph_client.close()
+            self._morph_client.close_sync()
             self._morph_client = None
 
     def close(self) -> None:
@@ -681,7 +684,7 @@ class ApplyToolManager:
             logger.info(f"Apply manager metrics: {self._metrics.to_dict()}")
 
         if self._morph_client:
-            self._morph_client.close()
+            self._morph_client.close_sync()
             self._morph_client = None
         self._api_key_validated = None
         self._last_selection = None

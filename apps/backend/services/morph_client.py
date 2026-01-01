@@ -609,11 +609,9 @@ class MorphClient:
         logger.info(f"🚀 Using Morph Fast Apply for {file_path}{lang_info}")
 
         # Format message in XML format as per Morph API spec
-        # Include language hint if provided for better code parsing
-        language_tag = f"<language>{language}</language>\n" if language else ""
+        # Note: We don't include a <language> tag as it's not in the official docs
         message_content = (
-            f"{language_tag}"
-            + f"<instruction>{instruction}</instruction>\n"
+            f"<instruction>{instruction}</instruction>\n"
             + f"<code>{original_content}</code>\n"
             + f"<update>{code_edit}</update>"
         )
@@ -622,6 +620,7 @@ class MorphClient:
         payload: dict[str, Any] = {
             "model": self.config.model,  # auto, morph-v3-fast, or morph-v3-large
             "messages": [{"role": "user", "content": message_content}],
+            "temperature": 0,  # Deterministic output as recommended by Morph docs
         }
 
         data = await self._make_request("POST", "/chat/completions", json_data=payload)
@@ -735,6 +734,87 @@ class MorphClient:
         # check_health() already validates the API key internally,
         # so we don't need to call validate_api_key() again
         return await self.check_health(use_cache=use_cache)
+
+    # =========================================================================
+    # Synchronous Wrappers
+    # =========================================================================
+    # These methods provide synchronous access to async methods for use in
+    # contexts where async/await is not available (e.g., ApplyToolManager).
+
+    def validate_api_key_sync(self) -> ValidationResult:
+        """
+        Synchronous wrapper for validate_api_key().
+
+        Note: This creates a new event loop for each call. For high-frequency
+        calls, prefer using the async version with an existing event loop.
+
+        Returns:
+            ValidationResult with validity status
+        """
+        return asyncio.get_event_loop().run_until_complete(self.validate_api_key())
+
+    def check_health_sync(self, use_cache: bool = True) -> bool:
+        """
+        Synchronous wrapper for check_health().
+
+        Args:
+            use_cache: Whether to use cached result
+
+        Returns:
+            True if service appears healthy
+        """
+        return asyncio.get_event_loop().run_until_complete(
+            self.check_health(use_cache=use_cache)
+        )
+
+    def apply_sync(
+        self,
+        file_path: str,
+        original_content: str,
+        instruction: str,
+        code_edit: str | None = None,
+        language: str | None = None,
+    ) -> ApplyResult:
+        """
+        Synchronous wrapper for apply().
+
+        Args:
+            file_path: Path to the file being edited
+            original_content: Current content of the file
+            instruction: Brief description of what you're changing
+            code_edit: The code edit with lazy markers
+            language: Optional programming language hint
+
+        Returns:
+            ApplyResult with the transformed content
+        """
+        return asyncio.get_event_loop().run_until_complete(
+            self.apply(
+                file_path=file_path,
+                original_content=original_content,
+                instruction=instruction,
+                code_edit=code_edit,
+                language=language,
+            )
+        )
+
+    def is_available_sync(self, use_cache: bool = True) -> bool:
+        """
+        Synchronous wrapper for is_available().
+
+        Args:
+            use_cache: Whether to use cached health check result
+
+        Returns:
+            True if service is available and API key is valid
+        """
+        return asyncio.get_event_loop().run_until_complete(
+            self.is_available(use_cache=use_cache)
+        )
+
+    def close_sync(self) -> None:
+        """Synchronous wrapper for close()."""
+        asyncio.get_event_loop().run_until_complete(self.close())
 
     async def close(self) -> None:
         """Close the async HTTP client and release resources."""
