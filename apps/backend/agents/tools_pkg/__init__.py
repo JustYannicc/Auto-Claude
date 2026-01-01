@@ -44,6 +44,7 @@ from .models import (
     # Auto-Claude tool names
     TOOL_GET_BUILD_PROGRESS,
     TOOL_GET_SESSION_CONTEXT,
+    TOOL_MORPH_APPLY,
     TOOL_RECORD_DISCOVERY,
     TOOL_RECORD_GOTCHA,
     TOOL_UPDATE_QA_STATUS,
@@ -88,6 +89,7 @@ __all__ = [
     "TOOL_RECORD_GOTCHA",
     "TOOL_GET_SESSION_CONTEXT",
     "TOOL_UPDATE_QA_STATUS",
+    "TOOL_MORPH_APPLY",
     # Config
     "get_write_tools",
     "is_electron_mcp_enabled",

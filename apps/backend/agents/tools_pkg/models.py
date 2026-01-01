@@ -13,6 +13,8 @@ the Claude Agent SDK client. Tool lists are organized by category:
 - Auto-Claude tools: Custom build management tools
 """
 
+from __future__ import annotations
+
 import os
 
 # =============================================================================
@@ -78,6 +80,9 @@ TOOL_RECORD_DISCOVERY = "mcp__auto-claude__record_discovery"
 TOOL_RECORD_GOTCHA = "mcp__auto-claude__record_gotcha"
 TOOL_GET_SESSION_CONTEXT = "mcp__auto-claude__get_session_context"
 TOOL_UPDATE_QA_STATUS = "mcp__auto-claude__update_qa_status"
+
+# Morph Fast Apply tool (conditionally added when MORPH_ENABLED=true)
+TOOL_MORPH_APPLY = "mcp__auto-claude__MorphApply"
 
 # =============================================================================
 # External MCP Tools
