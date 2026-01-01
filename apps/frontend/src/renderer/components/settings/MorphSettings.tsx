@@ -80,7 +80,8 @@ export function MorphSettings({ settings, onSettingsChange }: MorphSettingsProps
   };
 
   /**
-   * Validate the Morph API key by attempting to call the Morph API.
+   * Validate the Morph API key by calling the Morph API via IPC.
+   * The IPC handler runs in the main process to bypass CORS restrictions.
    * Uses a HEAD request first to avoid consuming API credits when possible.
    * Falls back to a minimal POST request only if HEAD is inconclusive.
    */
@@ -96,81 +97,35 @@ export function MorphSettings({ settings, onSettingsChange }: MorphSettingsProps
     setValidationStatus('validating');
     setErrorMessage(null);
 
-    const morphBaseUrl = 'https://api.morphllm.com/v1';
-
     try {
-      // First, try a HEAD request to check auth without consuming API credits
-      // This avoids unnecessary cost when validating API keys
-      const headResponse = await fetch(`${morphBaseUrl}/chat/completions`, {
-        method: 'HEAD',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json'
-        },
-        signal: AbortSignal.timeout(5000) // 5 second timeout for HEAD
-      });
-
+      const result = await window.electronAPI.validateMorphApiKey(apiKey);
       setLastValidatedKey(apiKey);
 
-      // HEAD request gives us a definitive answer for auth errors
-      if (headResponse.status === 401 || headResponse.status === 403) {
-        setValidationStatus('invalid');
-        setErrorMessage(t('morph.errors.invalidApiKey'));
-        return;
-      }
-
-      // If HEAD succeeded (2xx), auth is valid - no need to consume credits
-      if (headResponse.ok) {
-        setValidationStatus('valid');
-        setErrorMessage(null);
-        return;
-      }
-
-      // For other status codes (404, 405 Method Not Allowed, etc.), HEAD may not be supported
-      // Fall back to a minimal POST request (consumes credits but is reliable)
-      const postResponse = await fetch(`${morphBaseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: 'auto',
-          messages: [{ role: 'user', content: '<instruction>test</instruction><code>x</code><update>x</update>' }]
-        }),
-        signal: AbortSignal.timeout(10000) // 10 second timeout for POST
-      });
-
-      if (postResponse.ok) {
-        setValidationStatus('valid');
-        setErrorMessage(null);
-      } else if (postResponse.status === 401 || postResponse.status === 403) {
-        setValidationStatus('invalid');
-        setErrorMessage(t('morph.errors.invalidApiKey'));
-      } else if (postResponse.status >= 500) {
-        setValidationStatus('serviceUnavailable');
-        setErrorMessage(t('morph.errors.serviceUnavailable'));
-      } else {
+      if (!result.success || !result.data) {
+        // IPC call itself failed
         setValidationStatus('error');
+        setErrorMessage(result.error || t('morph.errors.validationFailed'));
+        return;
+      }
+
+      const { status, message } = result.data;
+      setValidationStatus(status);
+
+      // Set appropriate error message based on status
+      if (status === 'valid') {
+        setErrorMessage(null);
+      } else if (status === 'invalid') {
+        setErrorMessage(t('morph.errors.invalidApiKey'));
+      } else if (status === 'serviceUnavailable') {
+        // Use the message from the handler or fall back to translation
+        setErrorMessage(message || t('morph.errors.serviceUnavailable'));
+      } else {
         setErrorMessage(t('morph.errors.validationFailed'));
       }
     } catch (error) {
       setLastValidatedKey(apiKey);
-
-      if (error instanceof TypeError && error.message.includes('fetch')) {
-        // Network error - service might be unreachable
-        setValidationStatus('serviceUnavailable');
-        setErrorMessage(t('morph.errors.networkError'));
-      } else if (error instanceof DOMException && error.name === 'AbortError') {
-        // Timeout
-        setValidationStatus('serviceUnavailable');
-        setErrorMessage(t('morph.errors.timeout'));
-      } else {
-        // For any other error, we assume the key format might be valid
-        // but we couldn't verify it (fail open for better UX)
-        setValidationStatus('serviceUnavailable');
-        setErrorMessage(t('morph.errors.couldNotVerify'));
-      }
+      setValidationStatus('serviceUnavailable');
+      setErrorMessage(t('morph.errors.couldNotVerify'));
     }
   }, [settings.morphApiKey, t]);
 
