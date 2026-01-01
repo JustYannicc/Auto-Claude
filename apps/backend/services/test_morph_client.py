@@ -55,7 +55,7 @@ def test_config(test_api_key):
     """Provide a test MorphConfig."""
     return MorphConfig(
         api_key=test_api_key,
-        base_url="https://api.morphlabs.io/v1",
+        base_url="https://api.morphllm.com/v1",
         timeout=30.0,
         max_retries=2,
         backoff_factor=1.5,
@@ -85,20 +85,20 @@ def mock_validation_response():
 
 @pytest.fixture
 def mock_apply_response():
-    """Mock response for successful apply operation."""
+    """Mock response for successful apply operation (OpenAI-compatible format)."""
     return {
-        "success": True,
-        "result": {
-            "new_content": "def add(a: int, b: int) -> int:\n    return a + b",
-            "changes_applied": [
-                {
-                    "type": "add_type_hints",
-                    "description": "Added type hints to function parameters",
-                }
-            ],
-            "confidence": 0.95,
-        },
-        "metadata": {"processing_time_ms": 250},
+        "choices": [
+            {
+                "message": {
+                    "content": "def add(a: int, b: int) -> int:\n    return a + b",
+                    "role": "assistant",
+                },
+                "index": 0,
+                "finish_reason": "stop",
+            }
+        ],
+        "model": "morph-v3-fast",
+        "usage": {"prompt_tokens": 50, "completion_tokens": 20, "total_tokens": 70},
     }
 
 
@@ -128,7 +128,7 @@ class TestMorphConfig:
         """Verify default configuration values."""
         config = MorphConfig()
         assert config.api_key == ""
-        assert config.base_url == "https://api.morphlabs.io/v1"
+        assert config.base_url == "https://api.morphllm.com/v1"
         assert config.timeout == 60.0
         assert config.max_retries == 3
         assert config.backoff_factor == 1.5
@@ -391,45 +391,50 @@ class TestApplyOperations:
 
             assert result.success is True
             assert "def add(a: int, b: int) -> int:" in result.new_content
-            assert len(result.changes_applied) > 0
-            assert result.confidence == 0.95
-            assert result.processing_time_ms == 250
+            # Morph doesn't provide change details in response
+            assert result.changes_applied == []
+            assert result.confidence == 1.0
+            assert result.processing_time_ms == 0
 
-            # Verify request payload
+            # Verify request payload uses OpenAI-compatible format
             call_args = mock_request.call_args
-            assert call_args[0] == ("POST", "/apply")
+            assert call_args[0] == ("POST", "/chat/completions")
             payload = call_args[1]["json_data"]
-            assert payload["file_path"] == "utils.py"
-            assert payload["instruction"] == "Add type hints"
-            assert payload["language"] == "python"
+            assert payload["model"] == "auto"
+            assert "messages" in payload
+            # Verify XML format in message content
+            message_content = payload["messages"][0]["content"]
+            assert "<instruction>Add type hints</instruction>" in message_content
+            assert "<code>def add(a, b): return a + b</code>" in message_content
+            assert "<update>" in message_content
 
             client.close()
 
-    def test_apply_with_context(self, test_config, mock_apply_response):
-        """Verify apply with additional context."""
+    def test_apply_with_code_edit(self, test_config, mock_apply_response):
+        """Verify apply with explicit code_edit parameter."""
         with patch.object(MorphClient, "_make_request") as mock_request:
             mock_request.return_value = mock_apply_response
 
             client = MorphClient(test_config)
-            context = {"framework": "FastAPI", "version": "0.100.0"}
             result = client.apply(
                 file_path="api.py",
                 original_content="def handler(): pass",
                 instruction="Add async/await",
-                context=context,
+                code_edit="async def handler(): pass",
             )
 
             assert result.success is True
 
-            # Verify context was included
+            # Verify code_edit was used in the update section
             call_args = mock_request.call_args
             payload = call_args[1]["json_data"]
-            assert payload["context"] == context
+            message_content = payload["messages"][0]["content"]
+            assert "<update>async def handler(): pass</update>" in message_content
 
             client.close()
 
-    def test_apply_without_optional_params(self, test_config, mock_apply_response):
-        """Verify apply works without optional language and context."""
+    def test_apply_without_code_edit(self, test_config, mock_apply_response):
+        """Verify apply uses original_content as update when code_edit not provided."""
         with patch.object(MorphClient, "_make_request") as mock_request:
             mock_request.return_value = mock_apply_response
 
@@ -442,11 +447,12 @@ class TestApplyOperations:
 
             assert result.success is True
 
-            # Verify optional params not included
+            # Verify original_content was used as update (full file rewrite mode)
             call_args = mock_request.call_args
             payload = call_args[1]["json_data"]
-            assert "language" not in payload
-            assert "context" not in payload
+            message_content = payload["messages"][0]["content"]
+            assert "<code>print('hello')</code>" in message_content
+            assert "<update>print('hello')</update>" in message_content
 
             client.close()
 

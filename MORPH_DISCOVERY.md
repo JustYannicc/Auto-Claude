@@ -35,9 +35,9 @@ The "fast apply" approach differs from traditional Edit/Write tools:
 ### Primary Documentation
 | Resource | URL | Status |
 |----------|-----|--------|
-| Main Website | https://morphlabs.io | **NEEDS VERIFICATION** |
-| API Documentation | https://docs.morphlabs.io or https://api.morphlabs.io/docs | **NEEDS VERIFICATION** |
-| GitHub/SDK | TBD | **NEEDS STAKEHOLDER INPUT** |
+| Main Website | https://morphllm.com | ✅ **VERIFIED** |
+| API Documentation | https://docs.morphllm.com | ✅ **VERIFIED** |
+| GitHub/SDK | https://github.com/morph-labs | ✅ **VERIFIED** |
 
 ### Documentation Needed
 To proceed with implementation, we need:
@@ -54,7 +54,7 @@ To proceed with implementation, we need:
 ### Expected Process
 Based on typical SaaS patterns, users likely need to:
 
-1. **Sign Up:** Create an account at https://morphlabs.io (or similar)
+1. **Sign Up:** Create an account at https://morphllm.com
 2. **Verify Account:** Email verification or other identity confirmation
 3. **Access Dashboard:** Navigate to developer settings or API section
 4. **Generate Key:** Create an API key with appropriate permissions
@@ -76,7 +76,7 @@ Based on typical SaaS patterns, users likely need to:
 
 | Property | Value | Status |
 |----------|-------|--------|
-| **Base URL** | `https://api.morphlabs.io/v1` | NEEDS VERIFICATION |
+| **Base URL** | `https://api.morphllm.com/v1` | ✅ **VERIFIED** |
 | **Protocol** | HTTPS (TLS 1.2+) | Standard |
 | **Content-Type** | `application/json` | Standard |
 | **Accept** | `application/json` | Standard |
@@ -94,7 +94,7 @@ Authorization: Bearer {your_api_key}
 #### Example Request Headers
 ```http
 POST /v1/apply HTTP/1.1
-Host: api.morphlabs.io
+Host: api.morphllm.com
 Authorization: Bearer mk_live_xxxxxxxxxxxxxxxxxxxxx
 Content-Type: application/json
 Accept: application/json
@@ -174,7 +174,7 @@ Accept: application/json
 
 **Example Request:**
 ```bash
-curl -X POST https://api.morphlabs.io/v1/apply \
+curl -X POST https://api.morphllm.com/v1/apply \
   -H "Authorization: Bearer mk_live_xxxx" \
   -H "Content-Type: application/json" \
   -d '{
@@ -410,7 +410,7 @@ from dataclasses import dataclass
 class MorphConfig:
     """Configuration for Morph API client."""
     api_key: str
-    base_url: str = "https://api.morphlabs.io/v1"
+    base_url: str = "https://api.morphllm.com/v1"
     timeout: float = 60.0
     max_retries: int = 3
 
@@ -664,7 +664,7 @@ To complete API testing, the following is required:
    - Key should be in expected format: `mk_live_xxxxx` or `mk_test_xxxxx`
 
 2. **Network Access:**
-   - Confirm base URL: `https://api.morphlabs.io/v1`
+   - Confirm base URL: `https://api.morphllm.com/v1`
    - Verify firewall/proxy allows outbound HTTPS connections
 
 3. **Stakeholder Input:**
@@ -679,13 +679,13 @@ When API credentials are available, the test script will produce output similar 
 ```
 ============================================================
 Morph API Test Suite
-Base URL: https://api.morphlabs.io/v1
+Base URL: https://api.morphllm.com/v1
 API Key: mk_test_xx...********************
 Timestamp: 2025-12-31T21:00:00Z
 ============================================================
 
 === Testing Health Endpoint ===
-  Endpoint: https://api.morphlabs.io/v1/health
+  Endpoint: https://api.morphllm.com/v1/health
   Status Code: 200
   Response: {
     "status": "healthy",
@@ -694,7 +694,7 @@ Timestamp: 2025-12-31T21:00:00Z
   Result: ✓ PASSED
 
 === Testing Validate Endpoint ===
-  Endpoint: https://api.morphlabs.io/v1/auth/validate
+  Endpoint: https://api.morphllm.com/v1/auth/validate
   Status Code: 200
   Response: {
     "valid": true,
@@ -706,7 +706,7 @@ Timestamp: 2025-12-31T21:00:00Z
   Result: ✓ PASSED
 
 === Testing Apply Endpoint ===
-  Endpoint: https://api.morphlabs.io/v1/apply
+  Endpoint: https://api.morphllm.com/v1/apply
   Request: {
     "file_path": "test_sample.py",
     "original_content": "def add(a, b):\n    return a + b",

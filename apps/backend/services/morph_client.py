@@ -355,15 +355,16 @@ class MorphClient:
 
     def check_health(self, use_cache: bool = True) -> bool:
         """
-        Check if the Morph service is healthy.
+        Check if the Morph service is healthy by attempting a minimal API call.
 
-        This endpoint does not require authentication.
+        Note: Morph API does not have a dedicated /health endpoint. This method
+        attempts a simple validation to check if the service is responding.
 
         Args:
             use_cache: Whether to use cached result (default: True)
 
         Returns:
-            True if service is healthy, False otherwise
+            True if service appears healthy (API key valid and service responding), False otherwise
         """
         # Check cache
         if use_cache and self._health_cache is not None:
@@ -371,9 +372,10 @@ class MorphClient:
             if time.time() - cached_time < self.config.health_cache_ttl:
                 return cached_result
 
+        # Since there's no /health endpoint, we check if the API key is valid
+        # as a proxy for service health
         try:
-            data = self._make_request("GET", "/health", requires_auth=False)
-            is_healthy = data.get("status") == "healthy"
+            is_healthy = self.validate_api_key().valid
             self._health_cache = (is_healthy, time.time())
             return is_healthy
         except (MorphAPIError, MorphConnectionError, MorphTimeoutError) as e:
@@ -385,22 +387,40 @@ class MorphClient:
         """
         Validate the configured API key.
 
+        Note: Morph API does not have a dedicated /auth/validate endpoint.
+        This method attempts a minimal apply operation to verify the key works.
+
         Returns:
-            ValidationResult with account information if valid
+            ValidationResult with basic validity status
 
         Raises:
-            MorphAPIError: If the request fails (but not for invalid key)
+            MorphAPIError: If the request fails for reasons other than auth
         """
         if not self.config.has_api_key():
             return ValidationResult(valid=False)
 
         try:
-            data = self._make_request("GET", "/auth/validate")
-            return ValidationResult.from_response(data)
+            # Attempt a minimal apply operation to verify the API key works
+            # Use a small code snippet to minimize API usage
+            _ = self.apply(
+                file_path="test.py",
+                original_content="# test",
+                instruction="Keep as is",
+                code_edit="# test",
+            )
+            # If we get here, the API key is valid
+            return ValidationResult(
+                valid=True,
+                account_id="",  # Morph doesn't provide account info in responses
+                plan="",
+                rate_limit_rpm=0,
+                permissions=["apply"],
+            )
         except MorphAPIError as e:
             if e.status_code == 401:
                 logger.warning("Morph API key validation failed: invalid key")
                 return ValidationResult(valid=False)
+            # For other errors, re-raise so caller can handle
             raise
 
     def apply(
@@ -438,6 +458,9 @@ class MorphClient:
         # If code_edit not provided, use original_content (full file rewrite mode)
         if code_edit is None:
             code_edit = original_content
+
+        # Log that we're using Morph for this operation
+        logger.info(f"🚀 Using Morph Fast Apply for {file_path}")
 
         # Format message in XML format as per Morph API spec
         message_content = (
