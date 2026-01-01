@@ -16,12 +16,52 @@ the Claude Agent SDK client. Tool lists are organized by category:
 import os
 
 # =============================================================================
+# Helper Functions for Dynamic Tool Selection
+# =============================================================================
+
+
+def is_morph_enabled() -> bool:
+    """
+    Check if Morph Fast Apply is enabled.
+
+    Returns:
+        True if MORPH_ENABLED is set to 'true' and MORPH_API_KEY is configured
+    """
+    enabled = os.environ.get("MORPH_ENABLED", "").lower() == "true"
+    has_key = bool(os.environ.get("MORPH_API_KEY", "").strip())
+    return enabled and has_key
+
+
+def get_write_tools() -> list[str]:
+    """
+    Get the appropriate write tools based on Morph configuration.
+
+    When Morph is enabled, returns only Bash (excludes Write/Edit as they're replaced by Morph).
+    When Morph is disabled, returns the default write tools (Write, Edit, Bash).
+
+    Returns:
+        List of write tool names based on current configuration
+    """
+    if is_morph_enabled():
+        # When Morph is enabled, only provide Bash
+        # (Write/Edit are replaced by Morph's edit_file functionality)
+        return ["Bash"]
+    else:
+        # Normal mode: all default write tools
+        return list(BASE_WRITE_TOOLS)
+
+
+# =============================================================================
 # Base Tools (Built-in Claude Code tools)
 # =============================================================================
 
 # Core file operation tools
 BASE_READ_TOOLS = ["Read", "Glob", "Grep"]
-BASE_WRITE_TOOLS = ["Write", "Edit", "Bash", "Morph"]
+BASE_WRITE_TOOLS = [
+    "Write",
+    "Edit",
+    "Bash",
+]  # Default write tools (can be replaced by Morph when enabled)
 
 # Web tools for documentation lookup and research
 # Always available to all agents for accessing external information
@@ -149,7 +189,8 @@ AGENT_CONFIGS = {
         "thinking_default": "medium",
     },
     "spec_writer": {
-        "tools": BASE_READ_TOOLS + BASE_WRITE_TOOLS,
+        "tools": BASE_READ_TOOLS
+        + BASE_WRITE_TOOLS,  # Will be replaced dynamically by get_write_tools()
         "mcp_servers": [],  # Just writes spec.md
         "auto_claude_tools": [],
         "thinking_default": "high",
@@ -179,7 +220,7 @@ AGENT_CONFIGS = {
         "thinking_default": "high",
     },
     "spec_compaction": {
-        "tools": BASE_READ_TOOLS + BASE_WRITE_TOOLS,
+        "tools": BASE_READ_TOOLS + BASE_WRITE_TOOLS,  # Will be replaced dynamically
         "mcp_servers": [],
         "auto_claude_tools": [],
         "thinking_default": "medium",
@@ -189,7 +230,9 @@ AGENT_CONFIGS = {
     # Note: "linear" is conditional on project setting "update_linear_with_tasks"
     # ═══════════════════════════════════════════════════════════════════════
     "planner": {
-        "tools": BASE_READ_TOOLS + BASE_WRITE_TOOLS + WEB_TOOLS,
+        "tools": BASE_READ_TOOLS
+        + BASE_WRITE_TOOLS
+        + WEB_TOOLS,  # Will be replaced dynamically
         "mcp_servers": ["context7", "graphiti", "auto-claude"],
         "mcp_servers_optional": ["linear"],  # Only if project setting enabled
         "auto_claude_tools": [
@@ -200,7 +243,9 @@ AGENT_CONFIGS = {
         "thinking_default": "high",
     },
     "coder": {
-        "tools": BASE_READ_TOOLS + BASE_WRITE_TOOLS + WEB_TOOLS,
+        "tools": BASE_READ_TOOLS
+        + BASE_WRITE_TOOLS
+        + WEB_TOOLS,  # Will be replaced dynamically
         "mcp_servers": ["context7", "graphiti", "auto-claude"],
         "mcp_servers_optional": ["linear"],
         "auto_claude_tools": [
@@ -228,7 +273,9 @@ AGENT_CONFIGS = {
         "thinking_default": "high",
     },
     "qa_fixer": {
-        "tools": BASE_READ_TOOLS + BASE_WRITE_TOOLS + WEB_TOOLS,
+        "tools": BASE_READ_TOOLS
+        + BASE_WRITE_TOOLS
+        + WEB_TOOLS,  # Will be replaced dynamically
         "mcp_servers": ["context7", "graphiti", "auto-claude", "browser"],
         "mcp_servers_optional": ["linear"],
         "auto_claude_tools": [

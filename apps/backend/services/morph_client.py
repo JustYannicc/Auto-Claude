@@ -17,7 +17,7 @@ Key Features:
 
 Environment Variables:
 - MORPH_API_KEY: API key for authentication
-- MORPH_BASE_URL: Base URL for API (default: https://api.morphlabs.io/v1)
+- MORPH_BASE_URL: Base URL for API (default: https://api.morphllm.com/v1)
 - MORPH_TIMEOUT: Request timeout in seconds (default: 60)
 """
 
@@ -106,7 +106,7 @@ class MorphConfig:
     """
 
     api_key: str = ""
-    base_url: str = "https://api.morphlabs.io/v1"
+    base_url: str = "https://api.morphllm.com/v1"
     timeout: float = 60.0
     max_retries: int = 3
     backoff_factor: float = 1.5
@@ -117,7 +117,7 @@ class MorphConfig:
         """Create configuration from environment variables."""
         return cls(
             api_key=os.environ.get("MORPH_API_KEY", ""),
-            base_url=os.environ.get("MORPH_BASE_URL", "https://api.morphlabs.io/v1"),
+            base_url=os.environ.get("MORPH_BASE_URL", "https://api.morphllm.com/v1"),
             timeout=float(os.environ.get("MORPH_TIMEOUT", "60")),
         )
 
@@ -408,16 +408,22 @@ class MorphClient:
         file_path: str,
         original_content: str,
         instruction: str,
+        code_edit: str | None = None,
         language: str | None = None,
         context: dict[str, Any] | None = None,
     ) -> ApplyResult:
         """
         Apply code changes using Morph Fast Apply.
 
+        Uses the Morph v1/chat/completions endpoint (OpenAI compatible) with XML-formatted
+        messages containing instruction, original code, and the code edit with lazy markers.
+
         Args:
-            file_path: Path to the file being edited (for context)
+            file_path: Path to the file being edited (for context/debugging)
             original_content: Current content of the file
-            instruction: The edit instruction to apply
+            instruction: Brief description of what you're changing
+            code_edit: The code edit with "// ... existing code ..." markers for unchanged sections.
+                      If not provided, uses original_content as the update (full file rewrite)
             language: Optional programming language hint
             context: Optional additional context
 
@@ -429,18 +435,41 @@ class MorphClient:
             MorphConnectionError: If unable to connect
             MorphTimeoutError: If the request times out
         """
-        payload: dict[str, Any] = {
-            "file_path": file_path,
-            "original_content": original_content,
-            "instruction": instruction,
-        }
-        if language:
-            payload["language"] = language
-        if context:
-            payload["context"] = context
+        # If code_edit not provided, use original_content (full file rewrite mode)
+        if code_edit is None:
+            code_edit = original_content
 
-        data = self._make_request("POST", "/apply", json_data=payload)
-        return ApplyResult.from_response(data)
+        # Format message in XML format as per Morph API spec
+        message_content = (
+            f"<instruction>{instruction}</instruction>\n"
+            f"<code>{original_content}</code>\n"
+            f"<update>{code_edit}</update>"
+        )
+
+        # Use OpenAI-compatible chat completions format
+        payload: dict[str, Any] = {
+            "model": "auto",  # auto model selects optimal (morph-v3-fast or morph-v3-large)
+            "messages": [{"role": "user", "content": message_content}],
+        }
+
+        data = self._make_request("POST", "/chat/completions", json_data=payload)
+
+        # Extract merged code from OpenAI-compatible response format
+        try:
+            merged_content = data["choices"][0]["message"]["content"]
+            return ApplyResult(
+                success=True,
+                new_content=merged_content,
+                changes_applied=[],  # Morph doesn't provide change details
+                confidence=1.0,
+                processing_time_ms=0,
+            )
+        except (KeyError, IndexError) as e:
+            raise MorphAPIError(
+                code=MorphErrorCode.PROCESSING_ERROR,
+                message=f"Failed to parse Morph API response: {e}",
+                status_code=500,
+            )
 
     def is_available(self, use_cache: bool = True) -> bool:
         """

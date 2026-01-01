@@ -16,6 +16,7 @@ for backwards compatibility.
 
 from .models import (
     AGENT_CONFIGS,
+    BASE_WRITE_TOOLS,
     CONTEXT7_TOOLS,
     ELECTRON_TOOLS,
     GRAPHITI_MCP_TOOLS,
@@ -23,6 +24,7 @@ from .models import (
     PUPPETEER_TOOLS,
     get_agent_config,
     get_required_mcp_servers,
+    get_write_tools,
 )
 from .registry import is_tools_available
 
@@ -60,6 +62,14 @@ def get_allowed_tools(
 
     # Start with base tools from config
     tools = list(config.get("tools", []))
+
+    # Replace BASE_WRITE_TOOLS with dynamic get_write_tools() based on Morph status
+    # This ensures that when Morph is enabled, Write/Edit are excluded
+    if any(tool in BASE_WRITE_TOOLS for tool in tools):
+        # Remove all default write tools from the list
+        tools = [t for t in tools if t not in BASE_WRITE_TOOLS]
+        # Add the appropriate write tools based on Morph configuration
+        tools.extend(get_write_tools())
 
     # Get required MCP servers for this agent
     required_servers = get_required_mcp_servers(
