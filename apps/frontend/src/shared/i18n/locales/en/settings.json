@@ -339,6 +339,22 @@
     "apiKeyLabel": "Morph API Key",
     "apiKeyDescription": "Enter your Morph API key to enable the service",
     "apiKeyPlaceholder": "morph_...",
+    "modelLabel": "Model",
+    "modelDescription": "Select which Morph model to use for code application",
+    "models": {
+      "auto": {
+        "label": "Auto (Recommended)",
+        "description": "Automatically selects the best model based on the task"
+      },
+      "morph-v3-fast": {
+        "label": "Morph v3 Fast",
+        "description": "Fastest model, optimized for speed (10,500+ tokens/sec)"
+      },
+      "morph-v3-large": {
+        "label": "Morph v3 Large",
+        "description": "Most accurate model, better for complex edits"
+      }
+    },
     "noApiKeyWarning": "Morph is enabled but no API key is configured. The system will fall back to default apply tools until a valid API key is provided.",
     "validateKey": "Validate",
     "status": {

@@ -6,6 +6,9 @@ This script tests connectivity and basic functionality of the Morph Fast Apply A
 Run this script to verify API credentials and service availability before
 implementing the full Morph integration.
 
+Note: Morph API does not have a dedicated /health endpoint. Connectivity is tested
+using HEAD requests to avoid consuming API credits.
+
 Usage:
     # Set API key via environment variable
     export MORPH_API_KEY="your-api-key-here"
@@ -15,9 +18,9 @@ Usage:
     python scripts/test_morph_api.py --api-key "your-api-key-here"
 
     # Test specific endpoints
-    python scripts/test_morph_api.py --test health
-    python scripts/test_morph_api.py --test validate
-    python scripts/test_morph_api.py --test apply
+    python scripts/test_morph_api.py --test connectivity  # HEAD request, no credits used
+    python scripts/test_morph_api.py --test validate      # Tries validation endpoints
+    python scripts/test_morph_api.py --test apply         # Full apply test (uses credits)
 
 Requirements:
     pip install httpx
@@ -81,38 +84,46 @@ class MorphAPITester:
             result["error"] = error
         self.results.append(result)
 
-    def test_health(self) -> bool:
-        """Test health check endpoint (no auth required)."""
-        print("\n=== Testing Health Endpoint ===")
-        try:
-            # Health check typically doesn't require auth
-            response = self._client.get("/health")
-            data = response.json() if response.status_code == 200 else {}
+    def test_connectivity(self) -> bool:
+        """Test basic API connectivity using a HEAD request.
 
-            success = response.status_code == 200 and data.get("status") == "healthy"
+        Note: Morph API does not have a dedicated /health endpoint.
+        We use a HEAD request to /chat/completions to verify connectivity
+        without consuming API credits.
+        """
+        print("\n=== Testing API Connectivity ===")
+        try:
+            # Use HEAD request to check connectivity without consuming credits
+            response = self._client.request("HEAD", "/chat/completions")
+
+            # HEAD returning 2xx or 405 (Method Not Allowed) means the endpoint exists
+            # 401/403 means auth is required (endpoint exists, key may be invalid)
+            success = response.status_code in (200, 204, 401, 403, 405)
 
             self._record_result(
-                "health_check",
+                "connectivity_check",
                 success,
                 {
                     "status_code": response.status_code,
-                    "response": data,
-                    "endpoint": f"{self.base_url}/health",
+                    "endpoint": f"{self.base_url}/chat/completions",
+                    "method": "HEAD",
                 }
             )
 
-            print(f"  Endpoint: {self.base_url}/health")
+            print(f"  Endpoint: {self.base_url}/chat/completions (HEAD)")
             print(f"  Status Code: {response.status_code}")
-            print(f"  Response: {json.dumps(data, indent=2)}")
-            print(f"  Result: {'✓ PASSED' if success else '✗ FAILED'}")
+            if success:
+                print(f"  Result: ✓ PASSED - API endpoint is reachable")
+            else:
+                print(f"  Result: ✗ FAILED - Unexpected status code")
 
             return success
 
         except httpx.ConnectError as e:
             self._record_result(
-                "health_check",
+                "connectivity_check",
                 False,
-                {"endpoint": f"{self.base_url}/health"},
+                {"endpoint": f"{self.base_url}/chat/completions"},
                 error=f"Connection error: {str(e)}"
             )
             print(f"  ERROR: Could not connect to {self.base_url}")
@@ -120,9 +131,9 @@ class MorphAPITester:
             return False
         except Exception as e:
             self._record_result(
-                "health_check",
+                "connectivity_check",
                 False,
-                {"endpoint": f"{self.base_url}/health"},
+                {"endpoint": f"{self.base_url}/chat/completions"},
                 error=str(e)
             )
             print(f"  ERROR: {e}")
@@ -274,19 +285,19 @@ class MorphAPITester:
         print(f"Timestamp: {datetime.utcnow().isoformat()}Z")
         print("=" * 60)
 
-        health_ok = self.test_health()
+        connectivity_ok = self.test_connectivity()
         validate_ok = self.test_validate()
         apply_ok = self.test_apply()
 
         print("\n" + "=" * 60)
         print("TEST SUMMARY")
         print("=" * 60)
-        print(f"  Health Check:  {'✓ PASSED' if health_ok else '✗ FAILED'}")
+        print(f"  Connectivity:  {'✓ PASSED' if connectivity_ok else '✗ FAILED'}")
         print(f"  API Validate:  {'✓ PASSED' if validate_ok else '✗ FAILED'}")
         print(f"  Apply Test:    {'✓ PASSED' if apply_ok else '✗ FAILED'}")
         print("=" * 60)
 
-        all_passed = health_ok and validate_ok and apply_ok
+        all_passed = connectivity_ok and validate_ok and apply_ok
         print(f"\nOVERALL: {'✓ ALL TESTS PASSED' if all_passed else '✗ SOME TESTS FAILED'}")
 
         return all_passed
@@ -323,7 +334,7 @@ def main():
     )
     parser.add_argument(
         "--test",
-        choices=["health", "validate", "apply", "all"],
+        choices=["connectivity", "validate", "apply", "all"],
         default="all",
         help="Which test to run (default: all)",
     )
@@ -346,8 +357,8 @@ def main():
     tester = MorphAPITester(args.api_key, args.base_url)
 
     try:
-        if args.test == "health":
-            success = tester.test_health()
+        if args.test == "connectivity":
+            success = tester.test_connectivity()
         elif args.test == "validate":
             success = tester.test_validate()
         elif args.test == "apply":

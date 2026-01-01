@@ -339,6 +339,22 @@
     "apiKeyLabel": "Clé API Morph",
     "apiKeyDescription": "Entrez votre clé API Morph pour activer le service",
     "apiKeyPlaceholder": "morph_...",
+    "modelLabel": "Modèle",
+    "modelDescription": "Sélectionnez le modèle Morph à utiliser pour l'application de code",
+    "models": {
+      "auto": {
+        "label": "Auto (Recommandé)",
+        "description": "Sélectionne automatiquement le meilleur modèle selon la tâche"
+      },
+      "morph-v3-fast": {
+        "label": "Morph v3 Rapide",
+        "description": "Modèle le plus rapide, optimisé pour la vitesse (10 500+ tokens/sec)"
+      },
+      "morph-v3-large": {
+        "label": "Morph v3 Large",
+        "description": "Modèle le plus précis, meilleur pour les modifications complexes"
+      }
+    },
     "noApiKeyWarning": "Morph est activé mais aucune clé API n'est configurée. Le système utilisera les outils d'application par défaut jusqu'à ce qu'une clé API valide soit fournie.",
     "validateKey": "Valider",
     "status": {

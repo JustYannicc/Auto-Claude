@@ -10,7 +10,8 @@ import {
   AlertCircle,
   Loader2,
   RefreshCw,
-  AlertTriangle
+  AlertTriangle,
+  ChevronDown
 } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -18,6 +19,13 @@ import { Switch } from '../ui/switch';
 import { Button } from '../ui/button';
 import { SettingsSection } from './SettingsSection';
 import type { AppSettings } from '../../../shared/types';
+
+// Morph model options
+const MORPH_MODELS = [
+  { value: 'auto', label: 'Auto (Recommended)', description: 'Automatically selects the best model' },
+  { value: 'morph-v3-fast', label: 'Morph v3 Fast', description: 'Fastest model, optimized for speed' },
+  { value: 'morph-v3-large', label: 'Morph v3 Large', description: 'Most accurate model, better for complex edits' },
+] as const;
 
 interface MorphSettingsProps {
   settings: AppSettings;
@@ -67,9 +75,14 @@ export function MorphSettings({ settings, onSettingsChange }: MorphSettingsProps
     setErrorMessage(null);
   };
 
+  const handleModelChange = (model: 'auto' | 'morph-v3-fast' | 'morph-v3-large') => {
+    onSettingsChange({ ...settings, morphModel: model });
+  };
+
   /**
-   * Validate the Morph API key by attempting to call the Morph API
-   * This provides user feedback about whether their key is valid
+   * Validate the Morph API key by attempting to call the Morph API.
+   * Uses a HEAD request first to avoid consuming API credits when possible.
+   * Falls back to a minimal POST request only if HEAD is inconclusive.
    */
   const validateApiKey = useCallback(async () => {
     const apiKey = settings.morphApiKey;
@@ -83,14 +96,39 @@ export function MorphSettings({ settings, onSettingsChange }: MorphSettingsProps
     setValidationStatus('validating');
     setErrorMessage(null);
 
-    try {
-      // Attempt to validate the API key with the Morph service
-      // The Morph API base URL - matches backend default
-      const morphBaseUrl = 'https://api.morphllm.com/v1';
+    const morphBaseUrl = 'https://api.morphllm.com/v1';
 
-      // Use chat completions endpoint for validation (Morph has no dedicated /validate endpoint)
-      // Send a minimal test message to verify the API key works
-      const response = await fetch(`${morphBaseUrl}/chat/completions`, {
+    try {
+      // First, try a HEAD request to check auth without consuming API credits
+      // This avoids unnecessary cost when validating API keys
+      const headResponse = await fetch(`${morphBaseUrl}/chat/completions`, {
+        method: 'HEAD',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        signal: AbortSignal.timeout(5000) // 5 second timeout for HEAD
+      });
+
+      setLastValidatedKey(apiKey);
+
+      // HEAD request gives us a definitive answer for auth errors
+      if (headResponse.status === 401 || headResponse.status === 403) {
+        setValidationStatus('invalid');
+        setErrorMessage(t('morph.errors.invalidApiKey'));
+        return;
+      }
+
+      // If HEAD succeeded (2xx), auth is valid - no need to consume credits
+      if (headResponse.ok) {
+        setValidationStatus('valid');
+        setErrorMessage(null);
+        return;
+      }
+
+      // For other status codes (404, 405 Method Not Allowed, etc.), HEAD may not be supported
+      // Fall back to a minimal POST request (consumes credits but is reliable)
+      const postResponse = await fetch(`${morphBaseUrl}/chat/completions`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${apiKey}`,
@@ -98,20 +136,18 @@ export function MorphSettings({ settings, onSettingsChange }: MorphSettingsProps
         },
         body: JSON.stringify({
           model: 'auto',
-          messages: [{ role: 'user', content: 'test' }]
+          messages: [{ role: 'user', content: '<instruction>test</instruction><code>x</code><update>x</update>' }]
         }),
-        signal: AbortSignal.timeout(10000) // 10 second timeout
+        signal: AbortSignal.timeout(10000) // 10 second timeout for POST
       });
 
-      setLastValidatedKey(apiKey);
-
-      if (response.ok) {
+      if (postResponse.ok) {
         setValidationStatus('valid');
         setErrorMessage(null);
-      } else if (response.status === 401 || response.status === 403) {
+      } else if (postResponse.status === 401 || postResponse.status === 403) {
         setValidationStatus('invalid');
         setErrorMessage(t('morph.errors.invalidApiKey'));
-      } else if (response.status >= 500) {
+      } else if (postResponse.status >= 500) {
         setValidationStatus('serviceUnavailable');
         setErrorMessage(t('morph.errors.serviceUnavailable'));
       } else {
@@ -284,6 +320,36 @@ export function MorphSettings({ settings, onSettingsChange }: MorphSettingsProps
                   </span>
                 </div>
               )}
+            </div>
+
+            {/* Model selection */}
+            <div className="space-y-2">
+              <Label htmlFor="morphModel" className="text-sm font-medium text-foreground">
+                {t('morph.modelLabel')}
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                {t('morph.modelDescription')}
+              </p>
+              <div className="relative max-w-xs">
+                <select
+                  id="morphModel"
+                  value={settings.morphModel || 'auto'}
+                  onChange={(e) => handleModelChange(e.target.value as 'auto' | 'morph-v3-fast' | 'morph-v3-large')}
+                  className="w-full h-9 px-3 pr-8 rounded-md border border-input bg-background text-sm appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                >
+                  {MORPH_MODELS.map((model) => (
+                    <option key={model.value} value={model.value}>
+                      {t(`morph.models.${model.value}.label`, { defaultValue: model.label })}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+              </div>
+              <p className="text-xs text-muted-foreground italic">
+                {t(`morph.models.${settings.morphModel || 'auto'}.description`, {
+                  defaultValue: MORPH_MODELS.find(m => m.value === (settings.morphModel || 'auto'))?.description
+                })}
+              </p>
             </div>
 
             {/* Warning if enabled but no API key */}
