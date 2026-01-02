@@ -112,18 +112,15 @@ def mock_apply_response():
 
 
 @pytest.fixture
-def clean_env():
-    """Ensure clean environment for tests."""
-    original_env = os.environ.copy()
+def clean_env(monkeypatch):
+    """Ensure clean environment for tests using monkeypatch for automatic cleanup."""
     # Remove any Morph-related env vars
-    os.environ.pop("MORPH_ENABLED", None)
-    os.environ.pop("MORPH_API_KEY", None)
-    os.environ.pop("MORPH_BASE_URL", None)
-    os.environ.pop("MORPH_MODEL", None)
-    os.environ.pop("MORPH_TIMEOUT", None)
+    monkeypatch.delenv("MORPH_ENABLED", raising=False)
+    monkeypatch.delenv("MORPH_API_KEY", raising=False)
+    monkeypatch.delenv("MORPH_BASE_URL", raising=False)
+    monkeypatch.delenv("MORPH_MODEL", raising=False)
+    monkeypatch.delenv("MORPH_TIMEOUT", raising=False)
     yield
-    os.environ.clear()
-    os.environ.update(original_env)
 
 
 # =============================================================================

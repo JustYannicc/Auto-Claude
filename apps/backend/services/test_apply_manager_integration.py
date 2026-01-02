@@ -122,25 +122,19 @@ def test_api_key():
 
 
 @pytest.fixture
-def morph_enabled_env(test_api_key):
-    """Set up environment with Morph enabled."""
-    original_env = os.environ.copy()
-    os.environ["MORPH_ENABLED"] = "true"
-    os.environ["MORPH_API_KEY"] = test_api_key
+def morph_enabled_env(test_api_key, monkeypatch):
+    """Set up environment with Morph enabled using monkeypatch for automatic cleanup."""
+    monkeypatch.setenv("MORPH_ENABLED", "true")
+    monkeypatch.setenv("MORPH_API_KEY", test_api_key)
     yield
-    os.environ.clear()
-    os.environ.update(original_env)
 
 
 @pytest.fixture
-def morph_disabled_env():
-    """Set up environment with Morph disabled."""
-    original_env = os.environ.copy()
-    os.environ.pop("MORPH_ENABLED", None)
-    os.environ.pop("MORPH_API_KEY", None)
+def morph_disabled_env(monkeypatch):
+    """Set up environment with Morph disabled using monkeypatch for automatic cleanup."""
+    monkeypatch.delenv("MORPH_ENABLED", raising=False)
+    monkeypatch.delenv("MORPH_API_KEY", raising=False)
     yield
-    os.environ.clear()
-    os.environ.update(original_env)
 
 
 # =============================================================================
