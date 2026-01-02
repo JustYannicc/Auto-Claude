@@ -989,9 +989,6 @@ def create_morph_client() -> MorphClient | None:
     if not is_morph_enabled():
         return None
 
+    # is_morph_enabled() already verifies API key is set
     config = MorphConfig.from_env()
-    if not config.has_api_key():
-        logger.warning("Morph is enabled but no API key configured")
-        return None
-
     return MorphClient(config)
