@@ -85,12 +85,16 @@ def create_morph_tools(spec_dir: Path, project_dir: Path) -> list[Any]:
     Create Morph Fast Apply tools.
 
     Args:
-        spec_dir: Path to the spec directory
+        spec_dir: Path to the spec directory (unused, kept for API consistency
+                  with other tool creators like create_progress_tools, etc.)
         project_dir: Path to the project root
 
     Returns:
         List of Morph tool functions
     """
+    # spec_dir is intentionally unused - kept for API consistency with other tool creators
+    _ = spec_dir
+
     if not _sdk_tools_available or tool is None:
         return []
 
