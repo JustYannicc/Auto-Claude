@@ -12,8 +12,8 @@ Key Features:
 - Smart retry with different approaches
 - Escalation to human when stuck
 
-NOTE: Uses `from __future__ import annotations` for Python 3.12+ compatibility
-with type hints like `str | None`.
+NOTE: Uses `from __future__ import annotations` for forward-reference style annotations.
+This project requires Python 3.12+ (see CLAUDE.md).
 """
 
 from __future__ import annotations
