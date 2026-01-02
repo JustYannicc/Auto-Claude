@@ -7,16 +7,7 @@
 
 import { ipcMain } from 'electron';
 import { IPC_CHANNELS } from '../../shared/constants';
-import type { IPCResult } from '../../shared/types';
-
-/**
- * Morph API validation result
- */
-export interface MorphValidationResult {
-  valid: boolean;
-  status: 'valid' | 'invalid' | 'serviceUnavailable' | 'error';
-  message?: string;
-}
+import type { IPCResult, MorphValidationResult } from '../../shared/types';
 
 const MORPH_BASE_URL = process.env.MORPH_BASE_URL || 'https://api.morphllm.com/v1';
 const HEAD_TIMEOUT = 5000;  // 5 seconds for HEAD request
