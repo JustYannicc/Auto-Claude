@@ -118,7 +118,7 @@ def mock_morph_apply_response():
 @pytest.fixture
 def test_api_key():
     """Test API key for mocked tests."""
-    return "test_morph_api_key_12345"
+    return "test_morph_api_key_12345"  # gitleaks:allow (fake test key)
 
 
 @pytest.fixture

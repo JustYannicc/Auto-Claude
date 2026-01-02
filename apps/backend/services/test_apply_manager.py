@@ -49,7 +49,7 @@ from services.morph_client import (  # type: ignore[reportImplicitRelativeImport
 @pytest.fixture
 def test_api_key():
     """Provide a test API key."""
-    return "test_morph_api_key_12345"
+    return "test_morph_api_key_12345"  # gitleaks:allow (fake test key)
 
 
 @pytest.fixture
