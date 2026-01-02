@@ -399,8 +399,8 @@ class ApplyToolManager:
                 use_cache=self.config.cache_availability
             ):
                 # check_health returns False for invalid API key or service issues
-                # Update our cached state based on this
-                self._api_key_validated = False
+                # Don't set _api_key_validated = False here - health check failure
+                # could be due to service unavailability, not necessarily an invalid key
                 return False, FallbackReason.SERVICE_UNAVAILABLE
             # If health check passed, API key is valid
             self._api_key_validated = True
@@ -639,7 +639,7 @@ class ApplyToolManager:
         """
         self._api_key_validated = None
         if self._morph_client:
-            self._morph_client._health_cache = None
+            self._morph_client.invalidate_health_cache()
         self._last_selection = None
         logger.debug("Apply manager cache invalidated")
 

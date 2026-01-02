@@ -18,7 +18,7 @@ export interface MorphValidationResult {
   message?: string;
 }
 
-const MORPH_BASE_URL = 'https://api.morphllm.com/v1';
+const MORPH_BASE_URL = process.env.MORPH_BASE_URL || 'https://api.morphllm.com/v1';
 const HEAD_TIMEOUT = 5000;  // 5 seconds for HEAD request
 const POST_TIMEOUT = 10000; // 10 seconds for POST request
 

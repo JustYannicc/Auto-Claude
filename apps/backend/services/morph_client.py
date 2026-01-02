@@ -618,9 +618,11 @@ class MorphClient:
         logger.info(f"🚀 Using Morph Fast Apply for {file_path}{lang_info}")
 
         # Format message in XML format as per Morph API spec
-        # Note: We don't include a <language> tag as it's not in the official docs
+        # Include language tag when provided for better parsing by Morph
+        lang_tag = f"<language>{language}</language>\n" if language else ""
         message_content = (
-            f"<instruction>{instruction}</instruction>\n"
+            lang_tag
+            + f"<instruction>{instruction}</instruction>\n"
             + f"<code>{original_content}</code>\n"
             + f"<update>{code_edit}</update>"
         )
@@ -861,6 +863,15 @@ class MorphClient:
     def close_sync(self) -> None:
         """Synchronous wrapper for close()."""
         self._run_sync(self.close())
+
+    def invalidate_health_cache(self) -> None:
+        """
+        Invalidate the cached health check result.
+
+        Call this when settings change to force a fresh health check
+        on the next availability check.
+        """
+        self._health_cache = None
 
     async def close(self) -> None:
         """Close the async HTTP client and release resources."""

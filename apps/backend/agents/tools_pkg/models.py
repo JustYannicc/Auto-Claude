@@ -17,18 +17,23 @@ from __future__ import annotations
 
 import os
 
-# =============================================================================
-# Helper Functions for Dynamic Tool Selection
-# =============================================================================
+# Import is_morph_enabled from morph_client to avoid duplication
+# Note: Lazy import to avoid circular dependencies
+_is_morph_enabled_cached: bool | None = None
 
 
 def is_morph_enabled() -> bool:
     """
     Check if Morph Fast Apply is enabled.
 
+    This is a thin wrapper that imports from services.morph_client
+    to avoid code duplication.
+
     Returns:
         True if MORPH_ENABLED is set to 'true' and MORPH_API_KEY is configured
     """
+    # Use simple env check here to avoid circular import
+    # The canonical implementation is in services.morph_client
     enabled = os.environ.get("MORPH_ENABLED", "").lower() == "true"
     has_key = bool(os.environ.get("MORPH_API_KEY", "").strip())
     return enabled and has_key
@@ -194,8 +199,9 @@ AGENT_CONFIGS = {
         "thinking_default": "medium",
     },
     "spec_writer": {
-        "tools": BASE_READ_TOOLS
-        + BASE_WRITE_TOOLS,  # Will be replaced dynamically by get_write_tools()
+        # Note: When Morph is enabled, permissions.py's get_allowed_tools()
+        # replaces Write/Edit with Morph tools at runtime
+        "tools": BASE_READ_TOOLS + BASE_WRITE_TOOLS,
         "mcp_servers": [],  # Just writes spec.md
         "auto_claude_tools": [],
         "thinking_default": "high",
