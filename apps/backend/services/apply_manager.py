@@ -667,15 +667,21 @@ class ApplyToolManager:
         self.invalidate_cache()
 
         # Reinitialize Morph client if needed
-        if self.config.morph_enabled and self.config.has_api_key():
-            if self._morph_client:
-                self._morph_client.close_sync()
-            self._morph_client = MorphClient(
-                MorphConfig(api_key=self.config.morph_api_key)
-            )
-        elif self._morph_client:
-            self._morph_client.close_sync()
-            self._morph_client = None
+        old_client = self._morph_client
+        try:
+            if self.config.morph_enabled and self.config.has_api_key():
+                self._morph_client = MorphClient(
+                    MorphConfig(api_key=self.config.morph_api_key)
+                )
+            else:
+                self._morph_client = None
+        finally:
+            # Always close the old client to prevent resource leaks
+            if old_client:
+                try:
+                    old_client.close_sync()
+                except Exception as e:
+                    logger.warning(f"Error closing old Morph client: {e}")
 
     def close(self) -> None:
         """Close the manager and release resources."""
