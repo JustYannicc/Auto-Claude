@@ -17,26 +17,8 @@ from __future__ import annotations
 
 import os
 
-# Import is_morph_enabled from morph_client to avoid duplication
-# Note: Lazy import to avoid circular dependencies
-_is_morph_enabled_cached: bool | None = None
-
-
-def is_morph_enabled() -> bool:
-    """
-    Check if Morph Fast Apply is enabled.
-
-    This is a thin wrapper that imports from services.morph_client
-    to avoid code duplication.
-
-    Returns:
-        True if MORPH_ENABLED is set to 'true' and MORPH_API_KEY is configured
-    """
-    # Use simple env check here to avoid circular import
-    # The canonical implementation is in services.morph_client
-    enabled = os.environ.get("MORPH_ENABLED", "").lower() == "true"
-    has_key = bool(os.environ.get("MORPH_API_KEY", "").strip())
-    return enabled and has_key
+# Import is_morph_enabled from morph_client - the single source of truth
+from services.morph_client import is_morph_enabled
 
 
 def get_write_tools() -> list[str]:
