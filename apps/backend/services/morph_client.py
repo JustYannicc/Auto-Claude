@@ -308,6 +308,8 @@ class MorphClient:
         self.config = config or MorphConfig.from_env()
         self._client: httpx.AsyncClient | None = None
         self._health_cache: tuple[bool, float] | None = None
+        # Reusable executor for sync wrappers in async contexts
+        self._sync_executor: Any = None  # concurrent.futures.ThreadPoolExecutor
 
     async def _get_client(self) -> httpx.AsyncClient:
         """Get or create the async HTTP client."""
@@ -806,7 +808,7 @@ class MorphClient:
 
         Handles the case where we might already be inside an event loop
         (e.g., in Jupyter notebooks or nested async contexts) by using
-        a thread pool executor.
+        a reusable thread pool executor to avoid per-call overhead.
 
         Args:
             coro: The coroutine to run
@@ -818,11 +820,15 @@ class MorphClient:
             # Check if we're already in an event loop
             asyncio.get_running_loop()
             # If we are, we need to use a thread pool to avoid nesting
+            # Reuse executor to avoid creating a new one for each call
             import concurrent.futures
 
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                future = pool.submit(asyncio.run, coro)
-                return future.result()
+            if self._sync_executor is None:
+                self._sync_executor = concurrent.futures.ThreadPoolExecutor(
+                    max_workers=1
+                )
+            future = self._sync_executor.submit(asyncio.run, coro)
+            return future.result()
         except RuntimeError:
             # No running loop, safe to use asyncio.run()
             return asyncio.run(coro)
@@ -913,6 +919,10 @@ class MorphClient:
             await self._client.aclose()
             self._client = None
         self._health_cache = None
+        # Shutdown the sync executor if it was created
+        if self._sync_executor is not None:
+            self._sync_executor.shutdown(wait=False)
+            self._sync_executor = None
 
     async def __aenter__(self) -> MorphClient:
         """Async context manager entry."""
