@@ -171,14 +171,19 @@ export function MorphSettings({ settings, onSettingsChange }: MorphSettingsProps
               <p className="text-xs text-muted-foreground">
                 {t('morph.info')}
               </p>
-              <button
-                type="button"
-                onClick={() => window.electronAPI?.openExternal('https://morph.so')}
+              <a
+                href="https://morphllm.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => {
+                  e.preventDefault();
+                  window.electronAPI?.openExternal('https://morphllm.com');
+                }}
                 className="inline-flex items-center gap-1 text-xs text-info hover:text-info/80 hover:underline transition-colors"
               >
                 <ExternalLink className="h-3 w-3" />
                 {t('morph.learnMore')}
-              </button>
+              </a>
             </div>
           </div>
         </div>
