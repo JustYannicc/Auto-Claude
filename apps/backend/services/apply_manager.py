@@ -343,7 +343,9 @@ class ApplyToolManager:
         Validate the configured API key.
 
         Returns:
-            True if API key is valid, False otherwise
+            True if API key is valid, False otherwise.
+            Note: Returns False for both invalid keys AND network/timeout errors.
+            Check logs for details on validation failures.
         """
         if self._api_key_validated is not None:
             return self._api_key_validated
